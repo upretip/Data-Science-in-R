@@ -1,0 +1,315 @@
+---
+title: "Chapter 4"
+author: "Parash Upreti"
+date: "July 11, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# CHAPTER 4 EXAMPLES IN R
+
+
+Exploring the iris data set.
+```{r, fig = T}
+head(iris)
+attach(iris)
+plot(Petal.Length,Petal.Width)
+plot(Petal.Length,Petal.Width,col=Species)
+plot(Petal.Length,Petal.Width,col=c('blue','red','purple')[Species])
+```
+
+## Decision trees with the rpart package.
+
+```{r, fig=T}
+library(rpart)
+library(rattle)
+library(RColorBrewer)
+
+iristree=rpart(Species~Sepal.Length+Sepal.Width+Petal.Length+Petal.Width,  data=iris)
+iristree=rpart(Species~.,data=iris)
+
+fancyRpartPlot(iristree)
+```
+
+Confusion matrix.
+
+```{r}
+predSpecies=predict(iristree,newdata=iris,type="class")
+confusionmatrix=table(Species,predSpecies)
+confusionmatrix
+```
+
+A second look at the iris scatterplot.
+
+```{r, fig=T}
+plot(jitter(Petal.Length),jitter(Petal.Width),col=c('blue','red','purple')[Species])
+lines(1:7,rep(1.8,7),col='black')
+lines(rep(2.4,4),0:3,col='black')
+```
+
+Accuracy for rpart tree.
+
+```{r}
+accuracy=sum(diag(confusionmatrix))/sum(confusionmatrix)
+accuracy
+
+#confmatrix function
+confmatrix=function(y,predy){
+  matrix=table(y,predy)
+  accuracy=sum(diag(matrix))/sum(matrix)
+  return(list(matrix=matrix,accuracy=accuracy,error=1-accuracy))
+}
+```
+
+confmatrix for iristree
+```{r}
+confmatrix(iris$Species,
+           predict(iristree,newdata=iris,type="class"))   
+```
+
+The party package.
+```{r, fig=T}
+library(party, quietly = T, warn.conflicts = F, verbose = F)
+iristree2=ctree(Species~.,data=iris)
+plot(iristree2)
+```
+
+Simple plot.
+
+```{r, fig=T}
+plot(iristree2,type='simple')
+
+
+#ctree confusion matrix.
+predSpecies=predict(iristree2,newdata=iris)
+confusionmatrix=table(Species,predSpecies)
+confusionmatrix
+```
+
+Controling the depth of the tree.
+
+```{r, fig=T}
+iristree3=ctree(Species~.,data=iris, controls=ctree_control(maxdepth=2))
+plot(iristree3)
+```
+
+
+
+# Training and Testing Sets for Iris Data
+
+```{r}
+set.seed(1120)
+train=sample(150,105)
+iris[train,]    #Training data  (70% of the data)
+iris[-train,]   #Test data      (30% of the data)
+
+#More general code for training set
+train=sample(nrow(iris),round(0.7*nrow(iris),0))
+```
+
+Use training data to construct a tree.
+```{r, fig= T}
+library(rpart)
+library(rattle)
+iristree=rpart(Species~.,data=iris[train,])
+fancyRpartPlot(iristree)
+```
+
+confmatrix function
+
+```{r}
+confmatrix=function(y,predy){
+  matrix=table(y,predy)
+  accuracy=sum(diag(matrix))/sum(matrix)
+  return(list(matrix=matrix,accuracy=accuracy,error=1-accuracy))
+}
+
+#Confusion matrix, accuracy, and error rate for training data.
+confmatrix(iris$Species[train],
+           predict(iristree,newdata=iris[train,],type="class"))
+
+
+#Confusion matrix, accuracy, and error rate for test data.
+confmatrix(iris$Species[-train],
+           predict(iristree,newdata=iris[-train,],type="class"))
+
+```
+
+
+## Example Data
+
+
+Import traindata.csv and testdata.csv. Make sure class variable is a factor. And quick data exploration.
+
+```{r, fig = T}
+traindata = read.csv(url("http://faculty.tarleton.edu/crawford/documents/Math5364/traindata.csv"))
+testdata = read.csv(url("http://faculty.tarleton.edu/crawford/documents/Math5364/testdata.csv"))
+traindata$class=as.factor(traindata$class)
+testdata$class=as.factor(testdata$class)
+
+#Quick Data Exploration
+dim(traindata)
+head(traindata)
+plot(traindata$x,traindata$y,col=traindata$class)
+
+dim(testdata)
+head(testdata)
+plot(testdata$x,testdata$y,col=testdata$class)
+```
+
+Building Tree 1 from the Slides
+```{r, fig=T}
+extree1=rpart(class~.,data=traindata)
+plot(extree1)
+confmatrix(traindata$class,predict(extree1,newdata=traindata,type='class'))
+confmatrix(testdata$class,predict(extree1,newdata=testdata,type='class'))
+```
+
+Number of Nodes for Tree 1
+
+```{r}
+extree1$frame       #Frame of information about the nodes
+dim(extree1$frame)  #First entry tells us how many nodes there are
+```
+
+Class Breakdown for Training and Testing Data
+```{r}
+table(traindata$class)
+table(traindata$class)/900
+
+table(testdata$class)
+table(testdata$class)/2100
+```
+
+
+### Confidence Intervals for Classification Accuracy
+
+
+Exact binomial test. Example test data had 2100 records, and 1488 were classified correctly.
+```{r}
+confmatrix(testdata$class,predict(extree1,newdata=testdata,type='class'))
+binom.test(1488,2100)
+```
+
+Building tree 2
+
+```{r, fig=T}
+extree2=rpart(class~.,data=traindata,
+              control=rpart.control(minsplit=1,cp=0))
+plot(extree2)
+confmatrix(traindata$class,predict(extree2,newdata=traindata,type='class'))
+confmatrix(testdata$class,predict(extree2,newdata=testdata,type='class'))
+```
+
+Building accuracy vectors
+```{r}
+accvector1=(testdata$class==predict(extree1,newdata=testdata,type='class'))
+table(accvector1)
+table(accvector1)/2100
+
+accvector2=(testdata$class==predict(extree2,newdata=testdata,type='class'))
+table(accvector2)
+table(accvector2)/2100
+```
+
+McNemar Table
+```{r}
+mcnemartable=table(accvector1,accvector2)
+mcnemartable
+```
+
+Chi-square statistic and p-value
+
+```{r}
+chisq=(abs(174-278)-1)^2/(174+278)
+chisq
+pchisq(chisq,df=1,lower.tail=FALSE)
+```
+
+Built-in Function
+```{r}
+mcnemar.test(mcnemartable)
+```
+
+Exact McNemar Test
+```{r}
+library(exact2x2)
+mcnemar.exact(mcnemartable)
+```
+
+
+
+## 10-fold Cross-validation
+
+Combine traindata and testdata.
+
+```{r}
+library(cvTools)
+Exdata=rbind(traindata,testdata)
+folds=cvFolds(nrow(Exdata),K=10,type='random')
+
+
+#createfolds function
+createfolds=function(n,K){
+  reps=ceiling(n/K)
+  folds=sample(rep(1:K,reps))
+  return(folds[1:n])
+}
+
+#Folds for Exdata
+set.seed(5364)
+folds=createfolds(nrow(Exdata),10)
+```
+
+Accuracy for first fold
+
+```{r}
+temptest=Exdata[folds==1,]
+temptrain=Exdata[folds!=1,]
+
+dim(temptest)
+dim(temptrain)
+
+colSums(Exdata[,1:2])
+colSums(temptest[,1:2])+colSums(temptrain[,1:2])
+
+temptree=rpart(class~.,data=temptrain)
+tempacc=confmatrix(temptest$class,
+                   predict(temptree,newdata=temptest,type="class"))$accuracy
+
+tempacc
+```
+
+Accuracy for all folds using a loop.
+
+```{r}
+accvector=1:10
+
+for(k in 1:10){
+  temptest=Exdata[folds==k,]
+  temptrain=Exdata[folds!=k,]
+  
+  temptree=rpart(class~.,data=temptrain)
+  accvector[k]=confmatrix(temptest$class,
+                     predict(temptree,newdata=temptest,type="class"))$accuracy
+}
+
+mean(accvector)
+```
+
+Delete-d Hints. Let d=20
+
+`index=sample(nrow(Exdata))`
+`index[1:20]`
+`index[21:nrow(Exdata)]`
+
+
+Bootstrap Hints
+
+`index=sample(nrow(Exdata),replace=TRUE)`
+
+
+

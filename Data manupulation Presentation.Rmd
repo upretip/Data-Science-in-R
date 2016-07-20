@@ -1,0 +1,140 @@
+---
+title: "Data Manupulation in R"
+author: "Parash Upreti"
+date: "May 17, 2016"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Review
+Data in R are in following structures
+
+- Numeric or Integer 
+- String
+- Factor
+- Date and Time
+
+Base R has some useful functions. Other functions can be created by user or used from R packages.
+
+
+
+Similarly, data can be created/simulated in R or imported from external file. Some famous dataset is already available in R or R packages.
+
+## Simulating Data in R
+
+Data can be simulated in R in different ways on case by case basis. Try following codes.
+
+```{r, echo = TRUE, results="hide"}
+x <- 1:10
+y <- seq(1,10)
+x == y
+
+z <- seq(0, 10, .1)
+z_sq <- z^2
+```
+
+```{r, echo = TRUE, results="hide"}
+x_norm <- rnorm(100, 0, 1)
+mean(x_norm)
+u <- runif(100, -1, 1)
+```
+
+`rnorm()` creates normally distributed data centered on mean and `runif()` creates uniformly distributed data on a given interval
+
+## Look for help
+
+What does certain code do? How to know if you do not know?
+
+
+- R has very well maintained documentation that can explain code or function very easily. This can be accessed on R official website or through help tab on bottom right window
+
+- Can look up what certain function does by simply asking in console using `?function()`. eg. `?runif()`, `??runif()`, `help(runif)`
+
+- Internet search: google (or other search engine), stackoverflow, etc. 
+
+## R Datasets
+
+Some famous datasets are available in R. Do you want to know what are available? Lets check out.
+
+```{r, echo=TRUE, results="hide"}
+data()
+```
+Note: These data are from a particular package called `datasets`. There are more data in other packages (as you can see if you scroll the result from `data()` screen).
+
+This is how you see all packages that are loaded that has data
+
+```{r, echo=TRUE, results="hide", warning=FALSE}
+#data(package = .packages(all.available = TRUE))
+```
+
+As you load more packages, you may get more R data. 
+You can access dataset from particular package by telling which package you want to look at. 
+
+## R Dataset contd...
+
+Looking at particular R Dataset
+```{r, echo = T, results="hide"}
+# Iris data is in the default 'dataset' package
+data(iris)  
+
+# Veteran data is in the survival package
+data(veteran, package = "survival")
+```
+When you run the above code the data apprears as `<Promise>` in your workspace. If you try to work with that data, it will appear under data. 
+
+## Exporatory data analysis on the `iris` dataset
+```{r, echo=TRUE}
+dim(iris)
+str(iris)
+head(iris,3)
+```
+Default `head` or `tail` will print 6 outputs. You can manupulate the numbers of rows by telling how many rows you want.
+
+The `iris` dataset has 150 rows and 5 columns. The `str` or structure of the data tells us that first four variables are numerical variables and fifth variable is the categorical variables with three levels (three species of flowers)
+
+## Summary of Iris data
+```{r}
+summary(iris)
+```
+It is important to look at the summary of the data. You can spot the basic structure and distribution of numerical data through mean, median, quartiles and count.You can also see how many observations are in each factors.
+
+## Plotting the data summary
+
+Lets use the base r package to plot some data. Scroll down for more plots
+
+```{r, echo=TRUE}
+boxplot(iris$Sepal.Width, horizontal = T)
+median(iris$Sepal.Width)
+hist(iris$Sepal.Width)
+plot(x = iris$Petal.Length, y = iris$Sepal.Length,
+     xlab = "Petal Length ",
+     ylab = "Sepal Length ",
+     main = "Scatterplot of Sepal vs Petal Length")
+```
+
+## Making scatter matrix plots
+
+We can also plot the all variables in the dataset at once. In this plot we removed the categorical variable `Species`. This helped us quickly understand relationship between different features.
+But we have to be careful which variables to plot in case of dataset with many variables.
+
+```{r, echo=TRUE}
+pairs(iris[,-5])
+```
+
+
+## Using `GGplot2` to plot and explore dataset
+
+`ggplot2` is a R package that is very useful for plotting. Install the package by typing `install.packages("ggplot2")` and then load the library `library(ggplot2)`. This package is much more extensive in plotting compared to the base plot in R.You can read more about `ggplot2` in the documentation.
+
+Lets explore some data using plot
+
+
+
+```{r pressure}
+ggplot(aes(x= Sepal.Length, y = Petal.Width), data = iris)+
+  geom_point(color = I(iris$Species))
+```
+
