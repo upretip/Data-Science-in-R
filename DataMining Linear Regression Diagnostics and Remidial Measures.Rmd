@@ -1,0 +1,308 @@
+---
+title: "Linear Regression Diagnostics and Remidial Measures"
+author: "Parash Upreti"
+date: "July 18, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+### Consequences of Incorrect Functional Form
+
+Creating data
+```{r,fig=T}
+set.seed(5366)
+x=1:100
+X=cbind(1,x,x^2)
+beta=c(10,-1.15,0.0205)
+y=X%*%beta+5*rnorm(100)
+mydata=data.frame(y,x)
+
+#Plot
+plot(y~x,data=mydata)
+
+#Fitting Quadratic Model
+model2=lm(y~x+I(x^2),data=mydata)
+summary(model2)
+
+plot(y~x,data=mydata)
+
+x.plot.vector=1:100
+y.plot.vector=predict(model2,
+                      newdata=data.frame(x=x.plot.vector))
+lines(x.plot.vector,
+      y.plot.vector,
+      col="red")
+```
+
+Residuals for Quadratic Model
+
+```{r,fig=T}
+betahat2=coef(model2)
+X2=model.matrix(model2)
+
+e2=y-X2%*%betahat2
+#e2
+e2=residuals(model2)
+#e2
+
+plot(x,e2)
+lines(x,rep(0,length(x)),col="red")
+```
+
+
+Fitting a linear model
+
+```{r,fig=T}
+plot(y~x,data=mydata)
+
+model1=lm(y~x,data=mydata)
+summary(model1)
+
+abline(model1,col="red")
+
+
+#Residuals for Linear Model
+e1=residuals(model1)
+
+plot(x,e1)
+lines(x,rep(0,length(x)),col="red")
+```
+
+
+f-test Function
+
+```{r}
+ftest=function(model0,model){
+  d0=length(coef(model0))
+  d=length(coef(model))
+  n=length(residuals(model))
+  F=((deviance(model0)-deviance(model))/(d-d0))/
+    ((deviance(model))/(n-d))
+  return(pf(F,d-d0,n-d,lower.tail=FALSE))
+}
+
+ftest(model1,model2)
+summary(model2)
+```
+
+Plots involving Yhat for Quadratic Model
+
+```{r,fig=T}
+X2 = model.matrix(model2)
+betahat2=coef(model2)
+yhat2=X2%*%betahat2
+
+plot(yhat2,y)
+lines(1:100,1:100,col="red")
+
+plot(yhat2,e2)
+lines(1:100,rep(0,100),col="red")
+```
+
+
+Plots involving Yhat for Linear Model
+
+```{r, fig=T}
+X1 = model.matrix(model1)
+betahat1=coef(model1)
+yhat1=X1%*%betahat1
+
+plot(yhat1,y)
+lines(1:100,1:100,col="red")
+
+plot(yhat1,e1)
+lines(1:100,rep(0,100),col="red")
+```
+
+
+
+### Design Matrix Assumptions
+
+Rank of Design Matrix for Model2
+
+```{r}
+library(Matrix)
+
+head(X2)
+dim(X2)
+
+rankMatrix(X2)
+
+#Model without Full Rank
+z=x
+model3=lm(y~x+I(x^2)+z)
+
+X3=model.matrix(model3)
+
+head(X3)
+dim(X3)
+
+rankMatrix(X3)
+
+summary(model3)
+
+
+#Multicollinearity
+w=x+rnorm(100)
+plot(x,w)
+cor(x,w)
+
+model4=lm(y~x+I(x^2)+w)
+summary(model4)
+```
+
+
+### NORMALITY OF ERROR TERMS
+
+Normal Data
+
+```{r,fig=T}
+set.seed(1234)
+e=rnorm(1000)
+hist(e)
+
+qqnorm(e)
+shapiro.test(e)
+
+#Uniform Data
+e=runif(1000)
+hist(e)
+
+qqnorm(e)
+shapiro.test(e)
+
+
+#Model with Nonnormal Errors
+x=1:100
+y=(200+3*x+20*rnorm(100))^3.56
+plot(x,y)
+
+model=lm(y~x)
+abline(model,col="red")
+
+e=residuals(model)
+
+qqnorm(e)
+shapiro.test(e)
+```
+
+
+Achieving Normality with Box-Cox Transformations
+
+```{r, fig=T}
+library(MASS)
+
+boxcox.results=boxcox(model)
+cbind(boxcox.results$x,boxcox.results$y)
+
+which.max(boxcox.results$y)
+lambda=boxcox.results$x[which.max(boxcox.results$y)]
+
+
+y.tilde=y^lambda
+
+
+trans.model=lm(y.tilde~x)
+
+plot(x,y.tilde)
+abline(trans.model,col="red")
+
+e.tilde=residuals(trans.model)
+qqnorm(e.tilde)
+shapiro.test(e.tilde)
+```
+
+Using Transformed Model to Make Predictions
+
+```{r, fig=T}
+new.data=data.frame(x=runif(10,min=0,max=100))
+y.tilde.hat=predict(trans.model,newdata=new.data)
+
+plot(new.data$x,y.tilde.hat)
+abline(trans.model,col="red")
+
+y.hat=y.tilde.hat^(1/lambda)
+
+plot(x,y)
+points(new.data$x,y.hat,col="red",pch=20)
+```
+
+### Constancy of Error Variance (Homoscedasticity)
+
+```{r, fig=T}
+library("lawstat")
+
+
+plot(x,abs(e))
+levene.test(e,as.factor(x<=median(x)))
+
+
+plot(x,abs(e.tilde))
+levene.test(e.tilde,as.factor(x<=median(x)))
+```
+
+A Permutation Test Example
+
+Creating Data
+
+```{r, fig=T}
+set.seed(403)
+x1=runif(100,min=0,max=100)
+x2=runif(100,min=0,max=100)
+epsilon=runif(100,min=-50,max=50)
+
+y=200+3*x1+5*x2+epsilon
+
+mydata=data.frame(y,x1,x2)
+plot(mydata)
+
+#Fitting a model and examining residuals
+model=lm(y~x1+x2)
+summary(model)
+
+e=residuals(model)
+hist(e)
+qqnorm(e)
+shapiro.test(e)
+```
+
+Model is `y = beta0 + beta1*x1 + beta2*x2`
+
+Permutation Test for H0: beta2=0
+
+```{r}
+N=1000
+beta2.star.vect = 1:N
+
+
+for(i in 1:N){
+  temp.x2 = sample(x2,
+                   size=length(x2),
+                   replace=FALSE)
+  temp.model=lm(y~x1+temp.x2)
+  temp.betahat=coef(temp.model)
+  beta2.star.vect[i]=temp.betahat[3]
+}
+
+
+hist(beta2.star.vect)     #All beta2 values from permutation test are stored in this vector
+
+
+betahat=coef(model)
+
+beta2hat=betahat[3]   
+beta2hat                  #Actual value of beta2hat that we observed
+```
+
+How do they compare?
+
+```{r}
+range(beta2.star.vect)
+
+perm.pvalue=mean(abs(beta2hat)<=abs(beta2.star.vect))
+perm.pvalue
+```

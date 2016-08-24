@@ -1,0 +1,228 @@
+---
+title: "Iris Data"
+author: "Parash Upreti"
+date: "July 4, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading Iris dataset from R base
+
+```{r}
+data(iris)
+head(iris)
+str(iris)
+```
+
+Exploring Iris dataset 
+
+```{r}
+summary(iris)
+dim(iris)
+cor.test(iris$Sepal.Length, iris$Petal.Length)
+library(ggplot2)
+
+
+```
+
+Visualizing Iris dataset
+```{r, fig=T}
+#Scatterplot to visualize 3 variables
+
+ggplot(iris, aes(x = Sepal.Length, y = Petal.Length,color = Species))+ 
+  geom_point() + geom_smooth(method = lm)+ geom_jitter()
+
+#frequency polygon
+ggplot(iris, aes(x = Petal.Width, color = Species))+ geom_freqpoly(binwidth =0.1)
+
+
+#Histogram of Sepal Length by Species. visualizing two variables in histogram
+ggplot(iris, aes(x= Sepal.Length))+ geom_histogram(col= "red", fill = I("blue"), binwidth = .2)+
+  facet_wrap(~Species)
+
+#Box plot of Species by Petal Width. Visualizing two variables in boxplot
+ggplot(iris, aes(x= Species, Petal.Width))+
+  geom_boxplot(outlier.size = 2, outlier.color = "blue", color = "red")
+
+ggplot(subset(iris, Petal.Length>=2.5 & Petal.Width>=1), aes(x = Petal.Length, y = Petal.Width))+
+  geom_point(aes(color = Species))
+```
+
+
+Making simple predictions by using the information already available.
+
+```{r}
+#Total number of predictions Petal Width seperates Setosa from non Setosa
+table(iris$Petal.Width<.9 , iris$Species)
+
+table(subset(iris, Species =! "Setosa")$Petal.Length<4.75, iris$Species)
+#Proprotions
+prop.table(table(iris$Petal.Width>.9 & iris$Petal.Length >4.8, iris$Species))
+
+```
+
+## Using Decision Trees
+
+Run the codes to see the output
+
+```{r, fig=T, results='hide'}
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(RColorBrewer)
+
+iris_tree<- rpart(Species~., data = iris)
+fancyRpartPlot(iris_tree)
+
+basic_predict<- predict(iris_tree, newdata = iris[,-5], type = "class")
+#summary(iris_tree)     #uncomment this code to see the details of the model
+iris_tree$frame
+
+#checking our accuracy of the prediction
+
+table(iris$Species, basic_predict)
+
+```
+
+Model was trained by using Iris dataset and the same dataset was used to test the model by removing the Species column. It predicted correctly `r sum(diag(table(iris$Species, basic_predict)))/150` times
+
+Predicting using decision trees by splitting into training and testing
+
+```{r}
+set.seed(1221)
+sampledata<- sample(nrow(iris), .75*(nrow(iris)))
+iris_train<- iris[sampledata, ]
+iris_test<- iris[-sampledata,]
+
+dim(iris_train)
+head(iris_train)
+
+iris_1_tree<-rpart(Species~., data = iris_train, control = rpart.control(cp = 0.04, minsplit = 5))
+fancyRpartPlot(iris_1_tree)
+
+iris_1_predict <- predict(iris_1_tree, newdata = iris_test[,-5], type = "class")
+
+sum(diag(table(iris_test$Species, iris_1_predict)))/38
+
+#exact binomial test
+
+binom.test(sum(diag(table(iris_test$Species, iris_1_predict))), 38)
+
+```
+
+### N-fold cross validation
+
+Cross validation helps identify if the model is overfitted or underfitted. Overfitting the model makes it too complex and will have low training error but high generalization erros and underfitting makes it too general and will have high training and generaliztion error. 
+
+Cross Validating the predictions using simulations of 20 different random samples
+
+```{r}
+
+
+confmatrix<- function(y, predy){
+    matrix= table(y, predy)
+    accuracy= sum(diag(matrix))/sum(matrix)
+    return(list(matrix = matrix, accuracy = accuracy, error = 1- accuracy))
+}
+
+#creating folds of data (literally folding the given data in n layers)
+
+createfolds<- function(n,X){
+    reps = ceiling(n/X)
+    folds = sample(rep(1:X,reps))
+    return(folds[1:n])
+}
+folds = createfolds(nrow(iris), 20)
+accvect<- 1:20   #empty vector to store data from simulation
+
+#Looping through the data to replicate/simulate models
+
+for (k in 1:20){
+  temptest<- iris[folds==k,]
+  temptrain<- iris[folds!=k,]
+  
+  temptree<- rpart(Species~., data = temptrain, control = rpart.control(cp= 0.01))
+  accvect[k]<- confmatrix(temptest$Species,
+                          predict(temptree, newdata = temptest[-5], type = "class"))$accuracy
+}
+summary(accvect)
+
+```
+
+This 20-fold cross validation showed that `r sum(accvect[accvect==1])` out of 20 instances had perfect predictions
+
+### Bootstrapping Cross Validation 
+
+Bootstrapping is random sampling with replacement. Same idea as n-fold cv, to create multiple test and train instances and see how well the model performs overall
+
+```{r}
+accvect_2<- 1:20  
+
+for (k in 1:20){
+  temptest<- iris[sample(nrow(iris),30, replace = T),]
+  temptrain<- iris[sample(nrow(iris),(nrow(iris)-30), replace = T),]
+  
+  temptree<- rpart(Species~., data = temptrain, control = rpart.control(cp= 0.01))
+  accvect_2[k]<- confmatrix(temptest$Species,
+                          predict(temptree, newdata = temptest[-5], type = "class"))$accuracy
+  
+}
+summary(accvect_2)
+```
+
+### Receiver Operating Curves (ROC)
+
+ROC curve is the plot of true positive and false positive rates. The numeric value of Area under the curve (AUC) is the measure of model discrimination between +ves and -ves. The higher AUC the better.
+
+
+
+```{r, fig=T}
+library(pROC)
+plot(roc(iris_test$Species=="virginica",predict(iris_1_tree, newdata = iris_test)[,3]), main =" ROC Curve of iris flower")
+#note the change in the predict function. It does not have the 'type' argument for roc curve plots 
+#ROC curve for each of the three flower is a little different.
+```
+
+
+## K-th Nearest Neighbour
+
+A simple algorithm that can classify object by comparing it to its neighbours. Usually looked at odd numbers of neighbours to avoid ties. Before creating models, it is sometimes very essential to standardize/normalize the data so that each variable gets the attention it needs.
+
+Previously had handcoded the entire normalizatoin process by finding mean and sd and then calculating z score. But check this out
+
+```{r}
+iris.scaled<- cbind(scale(iris[-5]), iris[5])
+head(iris.scaled)
+summary(iris.scaled)
+sd(iris.scaled$Sepal.Length)
+```
+
+As expected the mean of all the columns is 0 and standard deviation is 1.
+
+Plot to see if the data follow similar structure as before.
+
+```{r, fig=T}
+#ggplot way of plotting scatter matrix plot
+library(GGally)
+ggpairs(iris.scaled[-5])
+```
+
+KNN model using the class pacakge
+
+```{r}
+library(class)
+#training and testing data using preset seed
+iris.scaled_train<- iris.scaled[sampledata,]
+iris.scaled_test<- iris.scaled[-sampledata,]
+
+#there is only one step in predicting and training
+
+iris.scaled_knn<- knn(train = iris.scaled_train[-5], test = iris.scaled_test[-5], 
+                      cl = iris.scaled_train[5], k =3)
+
+```
+
+

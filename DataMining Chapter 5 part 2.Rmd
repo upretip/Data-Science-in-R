@@ -1,0 +1,12 @@
+---
+title: "Chapter 5 Contd."
+author: "Parash Upreti"
+date: "July 11, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
