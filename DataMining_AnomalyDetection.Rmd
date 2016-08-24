@@ -1,0 +1,207 @@
+---
+title: "Anomaly Detection"
+author: "Parash Upreti"
+date: "July 13, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Anomaly Detection in R
+
+Distance to k-Nearest Neighbor as Outlier Score
+
+First Example Data Set
+
+```{r}
+set.seed(5364)
+x1=rnorm(50)
+y1=rnorm(50)
+mydata1=data.frame(x=c(x1,6),y=c(y1,6))
+plot(mydata1,pch=16)
+
+#Distance Matrix
+D=as.matrix(dist(mydata1))
+
+#Distance to kth nearest neighbor (k=5)
+kdist=1:51
+
+for(i in 1:51){
+  kdist[i]=(sort(D[i,]))[6]
+}
+```
+
+Plotting data
+
+```{r,fig=T}
+library(proto)
+library(ggplot2)
+library(gridExtra)
+
+#Ordinary plot
+ggplot(data=mydata1,aes(x=x,y=y,size=3))+geom_point()
+
+#Plot with Color Determined by kdist
+ggplot(data=mydata1,aes(x=x,y=y,col=kdist,size=3))+geom_point()
+
+#Gradient Plot (Heatmap)
+ggplot(data=mydata1,aes(x=x,y=y,col=kdist,size=3))+geom_point()+
+  scale_colour_gradientn(colours=c("black", "red"))
+
+ggplot(data=mydata1,aes(x=x,y=y,col=kdist,size=3))+geom_point()+
+  scale_colour_gradientn(colours=c("blue", "red"))
+
+#Using Size to Represent kdist
+ggplot(data=mydata1,aes(x=x,y=y,size=kdist))+geom_point()
+
+#Density curve for Outlier Scores (kdist)
+plot(density(kdist))
+```
+
+Finding Rows with Outliers
+
+```{r}
+(1:51)[kdist>=6]
+
+#my.kdist function
+
+my.kdist=function(data,k){
+  n=nrow(data)
+  D=as.matrix(dist(data))
+  kdist=1:n
+  for(i in 1:n){
+    kdist[i]=(sort(D[i,]))[k+1]
+  }
+  return(kdist)
+}
+
+temp=my.kdist(mydata1,5)
+cor(temp,kdist)
+range(temp-kdist)
+```
+
+Second Example Data Set
+
+```{r, fig=T}
+set.seed(5364)
+x1=rnorm(50)
+y1=rnorm(50)
+x2=0.5*rnorm(5)+10
+y2=0.5*rnorm(5)+10
+set.seed(5364)
+mydata2=data.frame(x=c(x1,x2),y=c(y1,y2))
+plot(mydata2,pch=16)
+
+#Plot using kdist with k=5
+kdist=my.kdist(mydata2,5)
+
+ggplot(data=mydata2,aes(x=x,y=y,col=kdist,size=3))+geom_point()+
+  scale_colour_gradientn(colours=c("black", "red"))
+
+plot(density(kdist))
+(1:55)[kdist>=8]
+
+#Plot using kdist with k=4
+kdist=my.kdist(mydata2,4)
+
+ggplot(data=mydata2,aes(x=x,y=y,col=kdist,size=3))+geom_point()+
+  scale_colour_gradientn(colours=c("black", "red"))
+
+plot(density(kdist))
+```
+
+Third Example Data Set
+
+```{r, fig=T}
+set.seed(5366)
+x1=rnorm(10)
+y1=rnorm(10)
+x2=0.1*rnorm(10)+10
+y2=0.1*rnorm(10)
+mydata3=data.frame(x=c(x1,x2,6),y=c(y1,y2,5))
+plot(mydata3,pch=16)
+
+#Detecting Outliers
+kdist=my.kdist(mydata3,5)
+
+ggplot(data=mydata3,aes(x=x,y=y,col=kdist,size=3))+geom_point()+
+  scale_colour_gradientn(colours=c("blue", "red"))
+
+plot(density(kdist))
+(1:nrow(mydata3))[kdist>=4]
+
+```
+
+### Density as an Outlier Score
+
+Writing a density function
+
+```{r, fig=T}
+my.density=function(data,k){
+  n=nrow(data)
+  D=as.matrix(dist(data))
+  density=1:n
+  for(i in 1:n){
+    knn.distances=(sort(D[i,]))[2:(k+1)]
+    density[i]=(mean(knn.distances))^(-1)
+  }
+  return(density)
+}
+
+mydata3.density=my.density(mydata3,5)
+
+ggplot(data=mydata3,aes(x=x,y=y,col=mydata3.density,size=3))+geom_point()+
+  scale_colour_gradientn(colours=c("blue", "red"))
+
+ggplot(data=mydata3,aes(x=x,y=y,col=mydata3.density,size=3))+geom_point()+
+  scale_colour_gradientn(colours=c("red","blue"))
+
+plot(density(mydata3.density))
+```
+
+
+### Average Relative Density as an Outlier Score
+### Local Outlier Factor Method (LOF)           
+
+```{r, fig=T}
+library(DMwR)
+
+outlier.scores=lofactor(mydata3,k=5)
+
+ggplot(data=mydata3,aes(x=x,y=y,col=outlier.scores,size=3))+geom_point()+
+  scale_colour_gradientn(colours=c("blue","red"))
+
+plot(density(outlier.scores))
+```
+
+### Exploring Outliers in Iris Data with LOF
+
+Remove Species Labels
+
+```{r, fig=T}
+attach(iris)
+iris.x=iris[,1:4]
+outlier.scores=lofactor(iris.x,k=5)
+
+plot(density(outlier.scores))
+sum(outlier.scores>=1.7)
+sort(outlier.scores)
+
+outliers=(outlier.scores>=1.7)
+
+coloring=rep("black",150)
+coloring[outliers]=c("red","green","blue")
+
+plot(iris.x,col=coloring)
+#text()
+```
+
+
+
+
+
+
+

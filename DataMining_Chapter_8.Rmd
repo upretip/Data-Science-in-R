@@ -1,0 +1,775 @@
+---
+title: "Chapter 8"
+author: "Parash Upreti"
+date: "July 12, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# CHAPTER 8 EXAMPLES IN R
+
+
+
+### k-means
+
+
+Generating some data
+```{r, fig=T}
+set.seed(5364)
+x1=rnorm(100,5,1)
+x2=rnorm(100,15,1)
+x3=rnorm(100,10,1)
+
+y1=rnorm(100,10,1)
+y2=rnorm(100,10,1)
+y3=rnorm(100,20,1)
+
+mydata=data.frame(x=c(x1,x2,x3),y=c(y1,y2,y3))
+plot(y~x,data=mydata,asp=1)
+```
+
+Finding clusters with kmeans
+
+```{r, fig=T}
+kmeans.output=kmeans(mydata,centers=3)
+clusters=kmeans.output$cluster
+colvect=c("red","green","blue")
+plot(y~x,data=mydata,col=colvect[clusters],asp=1)
+```
+
+Centers of clusters
+
+```{r,fig=T}
+centers=kmeans.output$centers
+plot(y~x,data=mydata,col=colvect[clusters],asp=1)
+points(centers,col='black',pch=24,bg='black')
+```
+
+Sums of squares for kmeans
+
+```{r}
+kmeans.output$totss
+kmeans.output$withinss
+kmeans.output$tot.withinss
+kmeans.output$betweenss
+
+kmeans.output$tot.withinss+kmeans.output$betweenss
+```
+
+
+Bad choice of initial centers
+
+```{r, fig=T}
+centers0=cbind(c(9,10,11),c(20,10,20))
+kout=kmeans(mydata,centers=centers0)
+plot(y~x,data=mydata,col=colvect[kout$cluster],asp=1)
+points(centers0,col='black',pch=24,bg='black')
+kout$tot.withinss
+```
+
+Repeating k-means a large number of random times
+
+```{r, fig=T}
+repeat.kmeans=function(data,centers,repetitions){
+  best.kmeans=NULL
+  best.ssw=Inf
+  
+  for(i in 1:repetitions){
+    kmeans.temp=kmeans(x=data,centers=centers)
+    if(kmeans.temp$tot.withinss<best.ssw){
+      best.ssw=kmeans.temp$tot.withinss
+      best.kmeans=kmeans.temp
+    }
+  }
+  return(best.kmeans)
+}
+
+
+best=repeat.kmeans(mydata,3,1000)
+best$tot.withinss
+
+plot(y~x,data=mydata,col=best$cluster,asp=1)
+```
+
+k-means for iris data
+```{r}
+best=repeat.kmeans(iris[,1:4],3,1000)
+table(best$cluster,iris$Species)
+```
+
+### CLUSTER EVALUATION
+
+Generating data
+```{r, fig=T}
+set.seed(5364)
+x1=rnorm(100,5,1)
+x2=rnorm(100,15,1)
+x3=rnorm(100,10,1)
+
+y1=rnorm(100,10,1)
+y2=rnorm(100,10,1)
+y3=rnorm(100,20,1)
+
+mydata=data.frame(x=c(x1,x2,x3),y=c(y1,y2,y3))
+plot(y~x,data=mydata,asp=1)
+```
+
+repeat.kmeans
+
+```{r,fig=T}
+repeat.kmeans=function(data,centers,repetitions){
+  best.kmeans=NULL
+  best.ssw=Inf
+  
+  for(i in 1:repetitions){
+    kmeans.temp=kmeans(x=data,centers=centers)
+    if(kmeans.temp$tot.withinss<best.ssw){
+      best.ssw=kmeans.temp$tot.withinss
+      best.kmeans=kmeans.temp
+    }
+  }
+  return(best.kmeans)
+}
+
+
+#repetitions needed
+min.rep=function(K,epsilon){
+  ceiling(log(epsilon)/log(1-factorial(K)/K^K))
+}
+
+min.rep(3,.01)
+
+
+#best k-means 
+best=repeat.kmeans(mydata,3,1000)
+best$tot.withinss
+plot(y~x,data=mydata,col=best$cluster)
+
+
+#best k-means with 10 clusters
+min.rep(10,.01)
+best=repeat.kmeans(mydata,10,1000)
+best$tot.withinss
+plot(y~x,data=mydata,col=best$cluster)
+```
+
+## Plotting SSW vs K
+
+```{r,fig=T}
+plot.ssw=function(data,max.K,max.iter,epsilon){
+  ssw.vect=1:max.K
+  for(K in 1:max.K){
+    iter=min(max.iter,min.rep(K,epsilon))
+    kmeans.temp=repeat.kmeans(data,K,iter)
+    ssw.vect[K]=kmeans.temp$tot.withinss
+  }
+  plot(1:max.K,ssw.vect,xlab="K",ylab="SSW")
+}
+
+plot.ssw(mydata,10,1000,.01)
+plot.ssw(mydata,10,20000,.01)  #Same results
+```
+
+### Silhouette coefficient
+
+```{r}
+#K-means with K=3
+best=repeat.kmeans(mydata,3,1000)
+best$tot.withinss
+plot(y~x,data=mydata,col=best$cluster)
+
+#Distance matrix
+library(fields)
+dmatrix=rdist(mydata)
+
+
+#Inefficient distance matrix function
+distance.matrix=function(data){
+  n=nrow(data)
+  dmatrix=matrix(nrow=n,ncol=n)
+  for(i in 1:n){
+    for(j in 1:n){
+      dmatrix[i,j]=sum((data[i,]-data[j,])^2)
+    }
+  }
+  return(sqrt(dmatrix))
+}
+
+dmatrix2=distance.matrix(mydata)
+
+range(dmatrix-dmatrix2)
+
+
+#silhouette coefficient
+library(cluster)
+silhouette(x=best$cluster,dmatrix=dmatrix)
+silhouette(x=best$cluster,dmatrix=dmatrix)[,3]
+mean(silhouette(x=best$cluster,dmatrix=dmatrix)[,3])
+
+
+#Verifying the silhouette function
+abmatrix=matrix(nrow=300,ncol=3)
+avect=1:300
+bvect=1:300
+
+for(i in 1:300){
+  for(k in 1:3){
+    abmatrix[i,k]=mean(dmatrix[i,best$cluster==k])
+  }
+  avect[i]=abmatrix[i,best$cluster[i]]
+  bvect[i]=min(abmatrix[i,-best$cluster[i]])
+}
+
+mysilhouette=1:300
+for(i in 1:300){
+  mysilhouette[i]=(bvect[i]-avect[i])/max(avect[i],bvect[i])
+}
+  
+range(silhouette(x=best$cluster,dmatrix=dmatrix)[,3]-mysilhouette)
+
+
+#Wrapper for silhouette
+
+mysil=function(x,dmatrix){
+  return(mean(silhouette(x=x,dmatrix=dmatrix)[,3]))
+}
+
+mysil(best$cluster,dmatrix)
+```
+
+### K-means with K=10 and silhouette coefficient
+
+```{r, fig=T}
+best=repeat.kmeans(mydata,10,1000)
+best$tot.withinss
+plot(y~x,data=mydata,col=best$cluster)
+
+mysil(best$cluster,dmatrix)
+
+
+#Plotting silhouette vs K
+
+plot.sil=function(data,max.K,max.iter,epsilon,dmatrix){
+  sil.vect=1:max.K
+  for(K in 2:max.K){
+    iter=min(max.iter,min.rep(K,epsilon))
+    kmeans.temp=repeat.kmeans(data,K,iter)
+    sil.vect[K]=mysil(kmeans.temp$cluster,dmatrix)
+  }
+  sil.vect=sil.vect[2:max.K]
+  plot(2:max.K,sil.vect,xlab="K",ylab="Silhouette Coefficient")
+  return(max(sil.vect))
+}
+
+plot.sil(mydata,10,1000,.01,dmatrix)
+```
+
+### Significance Test
+
+```{r, fig = T}
+#Creating uniform data with same range and sample size.
+nrow(mydata)
+apply(mydata,2,range)
+n=nrow(mydata)
+range.matrix=apply(mydata,2,range)
+
+u.x=runif(n,range.matrix[1,1],range.matrix[2,1])
+u.y=runif(n,range.matrix[1,2],range.matrix[2,2])
+udata=data.frame(u.x,u.y)
+
+nrow(udata)
+apply(udata,2,range)
+
+plot(mydata)
+points(udata)
+
+u.dmatrix=distance.matrix(udata)
+plot.sil(udata,10,1000,.01,u.dmatrix)
+```
+
+iris revisited
+
+SSW and silhouette plots.  Optimal K=2
+
+```{r, fig=T}
+iris.x=iris[,1:4]
+iris.dmatrix=rdist(iris.x)
+plot.ssw(iris.x,10,1000,.01)
+plot.sil(iris.x,10,1000,.01,iris.dmatrix)
+
+#Visualizing clusters
+iris.kmeans=repeat.kmeans(iris.x,2,1000)
+table(iris$Species,iris.kmeans$cluster)
+
+plot(iris[,3:4],col=iris.kmeans$cluster)
+
+
+for(i in 2:4){
+  for(j in (1:(i-1))){
+    plot(iris[,c(i,j)],col=iris.kmeans$cluster)
+  }
+}
+
+
+#Entropy for iris clustering
+entropyterm=function(p){
+  if(p==0){return(0)}
+  return(-p*log(p,base=2))
+}
+
+entropy=function(p){
+  return(sum(sapply(p,entropyterm)))
+}
+
+table.entropy=function(table){
+  col.sums=apply(table,2,sum)
+  col.props=col.sums/sum(col.sums)
+  for(j in 1:ncol(table)){
+    if(sum(table[,j]!=0)){
+      table[,j]=table[,j]/sum(table[,j])
+    }
+  }
+  table.entropies=apply(table,2,entropy)
+  return(col.props%*%table.entropies)
+}
+
+iris.table=table(iris$Species,
+                 iris.kmeans$cluster)
+table.entropy(iris.table)
+```
+
+CHI-SQUARE TEST OF INDEPENDENCE
+
+```{r}
+mytable=matrix(c(16,14,13,13,14,6,10,8),nrow=2,byrow=TRUE)
+mytable
+
+chisq.test(mytable)
+
+
+pchisq(1.52,df=(4-1)*(2-1),lower.tail=FALSE)
+
+
+#Safer approach:  Monte-carlo method
+chisq.test(mytable,simulate.p.value=TRUE)
+
+
+#Testing independence of clusters
+#and Species labels for iris data
+
+iris.x=iris[,1:4]
+iris.kmeans=repeat.kmeans(iris.x,2,1000)
+iris.table=table(iris$Species,
+                 iris.kmeans$cluster)
+
+chisq.test(iris.table,simulate.p.value=TRUE)
+chisq.test(iris.table,simulate.p.value=FALSE)
+```
+
+### DBSCAN
+
+Creating some data
+
+unif.rect function
+
+```{r, fig=T}
+unif.rect=function(n,x0,y0,deltax,deltay){
+  x=runif(n,x0,x0+deltax)
+  y=runif(n,y0,y0+deltay)
+  return(cbind(x,y))
+}
+
+mydata=unif.rect(500,5,7,15,23)
+plot(mydata,asp=1)
+
+
+#Setting n
+set.seed(5364)
+n=100
+```
+```{r, fig=T}
+#mydata1
+mydata1=rbind(unif.rect(5*n,0,0,1,5),
+             unif.rect(4*n,1,0,4,1),
+             unif.rect(4*n,4,1,1,4))
+plot(mydata1,asp=1)
+
+
+#mydata2
+temp=rbind(unif.rect(5*n,0,0,1,5),
+           unif.rect(4*n,1,0,4,1),
+           unif.rect(4*n,4,1,1,4))
+mydata2=temp%*%cbind(c(1,0),c(0,-1))+cbind(rep(2,13*n),rep(7,13*n))
+plot(mydata2,asp=1)
+
+
+#mydata3
+mydata3=rbind(unif.rect(4*n,7,2,4,1),
+              unif.rect(4*n,10,3,1,4))
+plot(mydata3,asp=1)
+
+#mydata4
+temp=rbind(unif.rect(5*n,0,0,1,5),
+           unif.rect(4*n,1,0,4,1),
+           unif.rect(4*n,4,1,1,4))
+mydata4=temp%*%cbind(c(1,0),c(0,-1))+cbind(rep(8,13*n),rep(9,13*n))
+plot(mydata4,asp=1)
+
+#mydata
+mydata=rbind(mydata1,
+             mydata2,
+             mydata3,
+             mydata4)
+
+plot(mydata,asp=1)
+
+#Adding noise
+m=round(.08*47*n,0)
+mydata5=cbind(runif(m,0,13),
+              runif(m,0,9))
+
+mydata=rbind(mydata,
+             mydata5)
+plot(mydata,asp=1)
+
+```
+
+DBSCAN
+
+```{r, fig = T}
+library(fpc)
+
+mydata.dbscan=dbscan(mydata,eps=0.2,MinPts=5)
+names(mydata.dbscan)
+mydata.dbscan$cluster
+
+plot(mydata,asp=1,col=(mydata.dbscan$cluster+1))
+plot(mydata,asp=1,col=(mydata.dbscan$cluster))
+
+
+#Determining Eps
+
+dmatrix=rdist(mydata)
+sort.dmatrix=apply(dmatrix,2,sort)
+
+#k-dist means distance to 
+#kth nearest neighbor
+
+k=5
+kdist=sort.dmatrix[k,]
+
+plot(sort(kdist),type="l",
+     xlab="Points Sorted by k-dist",
+     ylab="k-dist")
+lines(1:length(kdist),rep(0.2,length(kdist)),col="red")
+
+
+
+#Eps too large
+mydata.dbscan=dbscan(mydata,eps=0.6,MinPts=5)
+plot(mydata,asp=1,col=(mydata.dbscan$cluster+1))
+
+
+#Eps too small
+mydata.dbscan=dbscan(mydata,eps=0.1,MinPts=5)
+plot(mydata,asp=1,col=(mydata.dbscan$cluster+1))
+```
+
+
+DBSCAN for iris data
+
+```{r}
+#Standardizing iris
+x=iris[,1:4]
+xbar=apply(x,2,mean)
+xbarMatrix=cbind(rep(1,150))%*%xbar
+s=apply(x,2,sd)
+sMatrix=cbind(rep(1,150))%*%s
+
+z=(x-xbarMatrix)/sMatrix
+apply(z,2,mean)
+apply(z,2,sd)
+
+plot(z[,3:4],col=iris$Species)
+
+
+
+
+#Determining Eps
+
+dmatrix=rdist(z)
+sort.dmatrix=apply(dmatrix,2,sort)
+
+k=5
+kdist=sort.dmatrix[k,]
+
+plot(sort(kdist),type="l",
+     xlab="Points Sorted by k-dist",
+     ylab="k-dist")
+lines(1:length(kdist),rep(0.79,length(kdist)),col="red")
+
+
+
+iris.dbscan=dbscan(z,eps=0.79,MinPts=5)
+plot(z[,3:4],col=(iris.dbscan$cluster+1))
+table(iris.dbscan$cluster)
+
+
+iris.table=table(iris$Species,
+                 iris.dbscan$cluster)
+iris.table=iris.table[,2:3]
+iris.table
+
+chisq.test(iris.table,simulate.p.value=TRUE)
+```
+
+
+### Agglomerative Hierarchical Clustering
+
+Generating some data
+
+```{r, fig=T}
+x1=c(0,1,-2)
+y1=c(0,1,3)
+mydata1=cbind(x1,y1)
+
+x2=c(0,3,1.5)
+y2=c(0,0,-8)
+mydata2=cbind(10+x2,y2)
+
+x3=c(0,0,1)
+y3=c(0,1,-5)
+mydata3=cbind(5+x3,20+y3)
+
+mydata=rbind(mydata1,mydata2,mydata3)
+plot(mydata)
+
+
+row.num=1:9
+plot(mydata,pch=as.character(row.num))
+
+
+#agnes (Agglomerative Nesting)
+library(cluster)
+
+mydata.agnes=agnes(mydata)
+
+
+#dendrogram
+pltree(mydata.agnes)
+
+
+#heights
+sort(mydata.agnes$height)
+```
+
+cutting the tree at a given height
+
+```{r, fig=T}
+mydata.cluster=cutree(as.hclust(mydata.agnes), h = 10)
+plot(mydata,col=mydata.cluster,pch=as.character(row.num))
+
+mydata.cluster=cutree(as.hclust(mydata.agnes), h = 15)
+plot(mydata,col=mydata.cluster,pch=as.character(row.num))
+
+
+mydata.heights=sort(mydata.agnes$height)
+mydata.cluster=cutree(as.hclust(mydata.agnes), h = mydata.heights[2])
+plot(mydata,col=mydata.cluster,pch=as.character(row.num))
+
+
+#cutting the tree based on number of clusters
+
+mydata.cluster=cutree(as.hclust(mydata.agnes), k = 4)
+plot(mydata,col=mydata.cluster,pch=as.character(row.num))
+
+
+mydata.cluster=cutree(as.hclust(mydata.agnes), k = 2)
+plot(mydata,col=mydata.cluster,pch=as.character(row.num))
+
+
+mydata.cluster=cutree(as.hclust(mydata.agnes), k = 7)
+plot(mydata,col=mydata.cluster,pch=as.character(row.num))
+```
+
+```{r, fig=T}
+#Generating some data
+set.seed(5364)
+x1=rnorm(100,5,1)
+x2=rnorm(100,15,1)
+x3=rnorm(100,10,1)
+
+y1=rnorm(100,10,1)
+y2=rnorm(100,10,1)
+y3=rnorm(100,20,1)
+
+mydata=data.frame(x=c(x1,x2,x3),y=c(y1,y2,y3))
+plot(y~x,data=mydata,asp=1)
+
+
+#agnes
+mydata.agnes=agnes(mydata)
+pltree(mydata.agnes)
+
+
+mydata.cluster=cutree(as.hclust(mydata.agnes), k = 3)
+plot(mydata,col=mydata.cluster)
+
+mydata.cluster=cutree(as.hclust(mydata.agnes), k = 9)
+plot(mydata,col=mydata.cluster)
+
+mydata.cluster=cutree(as.hclust(mydata.agnes), k = 21)
+plot(mydata,col=mydata.cluster)
+```
+
+iris data
+
+Standardizing iris
+
+```{r}
+x=iris[,1:4]
+xbar=apply(x,2,mean)
+xbarMatrix=cbind(rep(1,150))%*%xbar
+s=apply(x,2,sd)
+sMatrix=cbind(rep(1,150))%*%s
+
+z=(x-xbarMatrix)/sMatrix
+apply(z,2,mean)
+apply(z,2,sd)
+
+plot(z[,3:4],col=iris$Species)
+
+
+
+#agnes for iris data
+iris.agnes=agnes(z)
+pltree(iris.agnes)
+
+
+#k=2
+iris.cluster=cutree(as.hclust(iris.agnes), k = 2)
+plot(z[,3:4],col=iris.cluster)
+
+table(iris$Species,iris.cluster)
+
+
+#k=3
+iris.cluster=cutree(as.hclust(iris.agnes), k = 3)
+plot(z[,3:4],col=iris.cluster)
+
+table(iris$Species,iris.cluster)
+
+
+#Plotting multiple dimensions simultaneously
+plot(z,col=iris.cluster)
+
+
+#k=7
+iris.cluster=cutree(as.hclust(iris.agnes), k = 10)
+plot(z[,3:4],col=iris.cluster)
+
+table(iris$Species,iris.cluster)
+```
+
+
+
+### GAUSSIAN MIXTURE EM CLUSTERING
+
+#Generating data
+
+```{r, fig=T}
+set.seed(5364)
+x1=rnorm(100,5,1)
+x2=rnorm(100,15,1)
+x3=rnorm(100,10,1)
+
+y1=rnorm(100,10,1)
+y2=rnorm(100,10,1)
+y3=rnorm(100,20,1)
+
+mydata=data.frame(x=c(x1,x2,x3),y=c(y1,y2,y3))
+plot(y~x,data=mydata,asp=1)
+
+
+#Gaussian EM Clustering
+library(mixtools)
+
+mydata.gauss=mvnormalmixEM(mydata,k=3)
+names(mydata.gauss)
+
+
+#Posterior probabilities and clusters
+#mydata.gauss$posterior
+mydata.cluster=apply(mydata.gauss$posterior,
+                     1,
+                     which.max)
+plot(mydata,col=mydata.cluster)
+
+
+#Prior probabilities (also called mixing probabilities)
+mydata.gauss$lambda
+
+
+#Means for each cluster
+mydata.gauss$mu
+
+points(rbind(mydata.gauss$mu[[1]],
+             mydata.gauss$mu[[2]],
+             mydata.gauss$mu[[3]]),
+       pch=24,bg='blue',col="blue")
+
+
+#Covariance matrices for each cluster
+mydata.gauss$sigma
+```
+
+Generating more data
+
+multi.rnorm returns an n x p matrix, whose rows are randomly generated normal random vectors with mean vector mu and covariance matrix Sigma
+
+```{r, fig=T}
+library(expm)
+
+Sigma=cbind(c(25,8),c(8,16))
+Sigma
+sqrtm(Sigma)
+sqrtm(Sigma)%*%sqrtm(Sigma)
+
+multi.rnorm=function(n,mu,Sigma){
+  p=length(mu)
+  Z=matrix(nrow=n,
+           ncol=p,
+           rnorm(n*p))
+  X=rep(1,n)%*%rbind(mu)+Z%*%sqrtm(Sigma)
+  return(X)
+}
+
+mu=c(5,10)
+Sigma=cbind(c(25,8),c(8,16))
+
+X=multi.rnorm(1000000,mu,Sigma)
+
+apply(X,2,mean)
+cov(X)
+```
+
+Another example
+```{r,fig=T}
+mu1=c(10,5)
+Sigma1=cbind(c(4,0),c(0,1))
+
+mu2=c(30,15)
+Sigma2=cbind(c(4,8),c(8,25))
+
+
+mydata=rbind(multi.rnorm(300,mu1,Sigma1),
+             multi.rnorm(700,mu2,Sigma2))
+
+plot(mydata,asp=1)
+```
+
+
+

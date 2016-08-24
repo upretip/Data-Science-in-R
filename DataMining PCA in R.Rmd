@@ -1,0 +1,72 @@
+---
+title: "Principal components"
+author: "Parash Upreti"
+date: "July 18, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Generating Example Data
+```{r, fig=T}
+R=cbind(c(0.924,0.381),c(0.381,-0.925))
+D=diag(c(29.296,0.149))
+Sigma0.5=t(R)%*%sqrt(D)%*%R
+temp=t(Sigma0.5%*%matrix(rnorm(200),nrow=2))
+x1=temp[,1]
+x2=temp[,2]
+x1=x1-mean(x1)
+x2=x2-mean(x2)
+
+
+#Plotting Data
+plot(x1,x2)
+hist(x1)
+hist(x2)
+```
+
+Principal Components
+
+```{r}
+X=cbind(x1,x2)
+S=cov(X)
+S
+
+eigen(S)
+
+v1=eigen(S)$vectors[,1]
+v2=eigen(S)$vectors[,2]
+```
+
+Checking Orthonormality
+
+```{r, results='hide'}
+t(v1)%*%v1
+t(v2)%*%v2
+t(v1)%*%v2
+```
+
+```{r, fig=T}
+plot(x1,x2,asp=1)
+xrange=min(x1)+(0:100)/100*(max(x1)-min(x1))
+lines(xrange,v1[2]/v1[1] * xrange,col='red')
+lines(xrange,v2[2]/v2[1] * xrange,col='red')
+```
+
+Rotating Data with Principal Components
+
+```{r, fig=T}
+R=cbind(v1,v2)
+W=X%*%R
+cov(W)
+
+plot(W,asp=1)
+
+plot(X,asp=1)
+head(X)
+
+plot(W,asp=1)
+head(W)
+```

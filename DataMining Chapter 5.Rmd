@@ -1,0 +1,1599 @@
+---
+title: "Chapter 5"
+author: "Parash Upreti"
+date: "July 11, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## CHAPTER 5 EXAMPLES IN R
+
+Euclidean distance function
+
+```{r}
+euclidean=function(x1,x2){
+  return(sqrt((x1-x2)%*%(x1-x2)))
+}
+```
+
+Test example
+```{r}
+euclidean(c(1,0),c(0,1))
+
+#More examples
+x1=c(90,1300)
+x2=c(85,1200)
+euclidean(x1,x2)
+
+x1=c(70,950)
+x2=c(40,880)
+euclidean(x1,x2)
+
+xbar=c(67.04,978.21)
+s=c(18.61,132.35)
+
+x1=c(90,1300)
+x2=c(85,1200)
+z1=(x1-xbar)/s
+z2=(x2-xbar)/s
+euclidean(z1,z2)
+
+
+x1=c(70,950)
+x2=c(40,880)
+z1=(x1-xbar)/s
+z2=(x2-xbar)/s
+euclidean(z1,z2)
+```
+
+### Standardizing iris
+
+```{r, fig=T}
+x=iris[,1:4]
+xbar=apply(x,2,mean)
+xbarMatrix=cbind(rep(1,150))%*%xbar
+s=apply(x,2,sd)
+sMatrix=cbind(rep(1,150))%*%s
+
+z=(x-xbarMatrix)/sMatrix
+apply(z,2,mean)
+apply(z,2,sd)
+
+plot(z[,3:4],col=iris$Species)
+```
+
+Split iris into 70% training and 30% test data.
+
+```{r}
+set.seed=5364
+train=sample(nrow(z),nrow(z)*.7)
+
+z[train,]    #This is the training data
+z[-train,]   #This is the test data
+
+
+#confmatrix
+confmatrix=function(y,predy){
+  matrix=table(y,predy)
+  accuracy=sum(diag(matrix))/sum(matrix)
+  return(list(matrix=matrix,accuracy=accuracy,error=1-accuracy))
+}
+```
+
+# KNN
+
+The class package and knn function
+
+```{r}
+library(class)
+
+Species=iris$Species
+predSpecies=knn(train=z[train,],test=z[-train,],cl=Species[train],k=3)
+
+confmatrix(Species[-train],predSpecies)
+```
+
+Leave-one-out CV for knn
+
+```{r}
+predSpecies=knn.cv(train=z,cl=Species,k=3)
+confmatrix(Species,predSpecies)
+```
+
+Optimizing k with cross validation
+
+```{r}
+accvect=1:10
+
+for(k in 1:10){
+  predSpecies=knn.cv(train=z,cl=Species,k=k)
+  accvect[k]=confmatrix(Species,predSpecies)$accuracy
+}
+
+which.max(accvect)
+
+
+#knn with k = 7
+Species=iris$Species
+predSpecies=knn(train=z[train,],test=z[-train,],cl=Species[train],k=7)
+
+confmatrix(Species[-train],predSpecies)
+```
+
+### fgl Data
+
+```{r}
+library(MASS) ## a library of example data sets
+data(fgl) ## loads the data into R; see help(fgl)
+
+par(mfrow=c(3,3),mai=c(.3,.7,.7,.36))
+plot(RI ~ type, data=fgl, col=c(grey(.2),2:6))
+plot(Al ~ type, data=fgl, col=c(grey(.2),2:6))
+plot(Na ~ type, data=fgl, col=c(grey(.2),2:6))
+plot(Mg ~ type, data=fgl, col=c(grey(.2),2:6))
+plot(Ba ~ type, data=fgl, col=c(grey(.2),2:6))
+plot(Si ~ type, data=fgl, col=c(grey(.2),2:6))
+plot(K ~ type, data=fgl, col=c(grey(.2),2:6))
+plot(Ca ~ type, data=fgl, col=c(grey(.2),2:6))
+plot(Fe ~ type, data=fgl, col=c(grey(.2),2:6))
+```
+
+Standardize function
+
+Standardize accepts a matrix of quantitative variables x and returns the corresponding standardized matrix z whose columns have mean 0 and st dev 1.There is a built in function in R called `scale` which achieves the same as well.
+
+```{r}
+standardize=function(x){
+  xbar=apply(x,2,mean)
+  xbarMatrix=cbind(rep(1,nrow(x)))%*%xbar
+  s=apply(x,2,sd)
+  sMatrix=cbind(rep(1,nrow(x)))%*%s
+  
+  z=(x-xbarMatrix)/sMatrix
+  return(z)
+}
+```
+
+knn method from last time
+
+```{r}
+#knn.cv
+x=fgl[,1:9]
+z=standardize(x)
+y=fgl[,10]
+
+set.seed(1019)
+accvect=1:15
+
+library(class)
+for(k in 1:15){
+  predy=knn.cv(train=z,cl=y,k=k)
+  accvect[k]=confmatrix(y,predy)$accuracy
+}
+
+which.max(accvect)
+```
+
+knn with training and test data
+
+```{r}
+train=sample(nrow(z),round(nrow(z)*.7,0))
+
+predy=knn(train=z[train,],test=z[-train,],cl=y[train],k=3)
+
+confmatrix(y[-train],predy)
+```
+
+kknn approach
+
+```{r}
+library(kknn)
+fit.glass = train.kknn(type ~ ., data=fgl, kmax = 15, 
+                       kernel =c("rectangular","triangular", "epanechnikov",  "biweight",
+                                 "triweight","cos","inv", "gaussian" ,"optimal"), 
+                       distance = 2)
+plot(fit.glass)
+fit.glass$MISCLASS
+
+predy2=(kknn(type~.,train=fgl[train,],test=fgl[-train,],
+             k=3,kernel="rectangular",distance=2))$fitted.values
+
+confmatrix(y[-train],predy2)
+fit.glass$best.parameters
+predy3=(kknn(type~.,train=fgl[train,],test=fgl[-train,],
+             k=8,kernel="biweight",distance=2))$fitted.values
+confmatrix(y[-train],predy3)
+```
+
+
+# NAIVE BAYES CLASSIFICATION
+
+
+HouseVotes84 dataset
+
+```{r}
+library(mlbench)
+data(HouseVotes84)
+```
+
+Finding prior distribution
+```{r}
+library(e1071)
+
+model = naiveBayes(Class ~ ., data = HouseVotes84)
+model
+model$apriori
+table(HouseVotes84$Class)
+model$apriori/(sum(model$apriori))
+```
+
+Conditional probabilities
+```{r}
+model$tables
+(model$tables)$V8
+
+table(HouseVotes84$Class,HouseVotes84$V8)
+
+45/(45+218)
+218/(45+218)
+133/(133+24)
+24/(133+24)
+```
+
+Posterior probabilities
+```{r}
+predict(model,newdata=HouseVotes84[1,],type="raw")
+predict(model,newdata=HouseVotes84[1,],type="class")
+predict(model,newdata=HouseVotes84[1,])
+```
+
+Training and test data
+```{r}
+train=sample(nrow(HouseVotes84),round(.7*nrow(HouseVotes84),0))
+
+model=naiveBayes(Class ~ ., data = HouseVotes84[train,])
+predClass=predict(model,newdata=HouseVotes84[-train,])
+
+confmatrix(HouseVotes84$Class[-train],predClass)
+```
+
+Matrix of posterior probabilities
+
+```{r}
+predict(model,newdata=HouseVotes84[-train,],type="raw")
+```
+
+Quantitative Predictors
+```{r}
+attach(iris)
+
+model=naiveBayes(Species~.,data=iris)
+model
+
+mean(Petal.Length[Species=="setosa"])
+sd(Petal.Length[Species=="setosa"])
+```
+
+Normality for iris data
+
+```{r, fig = T}
+hist(Petal.Length)
+shapiro.test(Petal.Length)
+qqnorm(Petal.Length)
+```
+
+stratify by species
+
+```{r, fig=T}
+hist(Petal.Length[Species=="setosa"])
+shapiro.test(Petal.Length[Species=="setosa"])
+qqnorm(Petal.Length[Species=="setosa"])
+
+hist(Petal.Length[Species=="versicolor"])
+shapiro.test(Petal.Length[Species=="versicolor"])
+qqnorm(Petal.Length[Species=="versicolor"])
+
+hist(Petal.Length[Species=="virginica"])
+shapiro.test(Petal.Length[Species=="virginica"])
+qqnorm(Petal.Length[Species=="virginica"])
+
+
+for(j in 1:4){
+  for(spec in levels(Species)){
+    vect=iris[,j]
+    print(shapiro.test(vect[Species==spec]))
+  }
+}
+
+
+for(j in 1:4){
+  for(spec in levels(Species)){
+    vect=iris[,j]
+    hist(vect[Species==spec],xlab=spec)
+  }
+}
+
+
+for(j in 1:4){
+  for(spec in levels(Species)){
+    vect=iris[,j]
+    qqnorm(vect[Species==spec])
+  }
+}
+```
+
+test accuracy for iris data
+
+```{r}
+train=sample(nrow(iris),round(.7*nrow(iris),0))
+model=naiveBayes(Species~.,data=iris[train,])
+
+
+predSpecies=predict(model,newdata=iris[-train,])
+confmatrix(Species[-train],predSpecies)
+```
+
+Discretizing iris
+
+```{r}
+x=cut(1:100,breaks=4)
+is.factor(x)
+
+disciris=iris
+
+for(j in 1:4){
+  disciris[,j]=as.factor(cut(iris[,j],4))
+  
+}
+
+
+model=naiveBayes(Species~.,data=disciris[train,])
+
+
+predSpecies=predict(model,newdata=disciris[-train,])
+confmatrix(Species[-train],predSpecies)
+```
+
+Modifying the cut function
+
+```{r}
+mycut=function(vector,numbreaks){
+  probs=seq(from=0,to=1,by=1/numbreaks)
+  breaks=quantile(vector,probs=probs)
+  return(cut(vector,breaks=breaks))
+}
+```
+
+Flight data
+
+```{r}
+flight<- read.csv(url("http://faculty.tarleton.edu/crawford/documents/Math5364/flight.csv"))
+library(e1071)
+cattime=cut(flight$schedtime,breaks=seq(from=600,to=2200,by=100),right=FALSE)
+flight=cbind(flight,cattime)
+
+
+set.seed(5364)
+train=sample(nrow(flight),round(.7*nrow(flight),0))
+model=naiveBayes(delay~carrier+dest+origin+weather+dayweek+cattime,data=flight[train,])
+preddelay=predict(model,newdata=flight[-train,])
+confmatrix(flight$delay[-train],preddelay)
+cmatrix=confmatrix(flight$delay[-train],preddelay)$matrix
+```
+
+Performance metrics
+
+```{r}
+TP=cmatrix[1,1]
+TN=cmatrix[2,2]
+FP=cmatrix[2,1]
+FN=cmatrix[1,2]
+
+acc=(TP+TN)/(TP+TN+FP+FN)
+acc
+TPR=TP/(TP+FN)
+TNR=TN/(TN+FP)
+FPR=FP/(FP+TN)
+FNR=FN/(TP+FN)
+TPR
+TNR
+FPR
+FNR
+
+p=TP/(TP+FP)
+r=TP/(TP+FN)
+p
+r
+
+F1=2*r*p/(r+p)
+F1
+```
+
+Examples with F1
+
+```{r}
+F1=function(r,p){
+  return(2*r*p/(r+p))
+}
+
+F1(0.8,0.7)
+F1(0.2,0.85)
+F1(0.75,0.1)
+```
+
+## Probability threshold  
+
+### naiveBayes
+
+HouseVotes84 data
+
+```{r}
+library(mlbench)
+data(HouseVotes84)
+
+housetrain=sample(nrow(HouseVotes84),round(0.7*nrow(HouseVotes84),0))
+housemodel = naiveBayes(Class ~ ., data = HouseVotes84[housetrain,])
+predClass=predict(housemodel,newdata=HouseVotes84[-housetrain,])
+confmatrix(HouseVotes84$Class[-housetrain],predClass)
+```
+
+phat for naiveBayes
+
+```{r}
+table(HouseVotes84$Class)
+phat=predict(housemodel,newdata=HouseVotes84[-housetrain,],type="raw")[,2]
+hist(phat)
+table(predClass,(phat>=0.5))
+```
+
+phat for decision tree
+
+```{r, fig = T}
+library(rpart)
+library(rattle)
+mytree=rpart(Class~.,data=HouseVotes84[housetrain,])
+fancyRpartPlot(mytree)
+treepredClass=predict(mytree,newdata=HouseVotes84[-housetrain,],type="class")
+confmatrix(HouseVotes84$Class[-housetrain],treepredClass)
+treephat=predict(mytree,newdata=HouseVotes84[-housetrain,])[,2]
+table(treepredClass,(treephat>=0.5))
+```
+
+phat for kknn
+
+```{r}
+modHouse=HouseVotes84
+for(j in 2:17){
+  levels(modHouse[,j])=c("n","y","abstain")
+}
+modHouse[is.na(modHouse)]="abstain"
+modHouse
+
+
+kknnfit=train.kknn(Class~.,data=modHouse)
+kknnfit
+kknnmodel=kknn(Class~.,train=modHouse[housetrain,],
+               test=modHouse[-housetrain,],kernel="optimal",k=7)
+
+kknnpredClass=kknnmodel$fitted.values
+confmatrix(HouseVotes84$Class[-housetrain],kknnpredClass)
+kknnphat=(kknnmodel$prob)[,2]
+table(kknnpredClass,(kknnphat>=0.5))
+```
+
+
+phat for flight data
+
+```{r}
+phat=predict(model,newdata=flight[-train,],type="raw")[,1]
+table(preddelay,(phat>=0.5))
+```
+
+Tuning p0 with training data to optimize F1 for flight data
+
+```{r, fig=T}
+trainphat=predict(model,newdata=flight[train,],type="raw")[,1]
+
+
+trainprec=1:100
+trainrecall=1:100
+trainF1=1:100
+range(trainphat)
+p0vect=10^(-5+(1:100)/100*5)
+
+for(i in 1:100){
+  p0=p0vect[i]
+  trainpreddelay=(trainphat>=p0)*1
+  
+  TP=sum((trainpreddelay==1)&(flight$delay[train]=="delayed"))
+  FP=sum((trainpreddelay==1)&(flight$delay[train]!="delayed"))
+  FN=sum((trainpreddelay!=1)&(flight$delay[train]=="delayed"))
+  
+  trainprec[i]=TP/(TP+FP)
+  trainrecall[i]=TP/(TP+FN)
+  trainF1[i]=2*TP/(2*TP+FP+FN)
+  
+}
+
+plot(p0vect,trainrecall,type='l',xlab="Probability Threshold",ylab="")
+lines(p0vect,trainprec,col="blue")
+lines(p0vect,trainF1,col='red')
+
+plot(log(p0vect,base=10),trainrecall,type='l',xlab="log10(Probability Threshold)",ylab="")
+lines(log(p0vect,base=10),trainprec,col="blue")
+lines(log(p0vect,base=10),trainF1,col='red')
+
+which.max(trainF1)
+trainF1[which.max(trainF1)]
+trainprec[which.max(trainF1)]
+trainrecall[which.max(trainF1)]
+```
+
+Validating on Test Data
+
+```{r}
+p0=p0vect[which.max(trainF1)]
+
+testphat=predict(model,newdata=flight[-train,],type="raw")[,1]
+newpreddelay=testphat
+newpreddelay[testphat>=p0]="delayed"
+newpreddelay[testphat<p0]="ontime"
+
+
+confmatrix(flight$delay[-train],newpreddelay)
+cmatrix=confmatrix(flight$delay[-train],newpreddelay)$matrix
+```
+
+Performance metrics of flight data predictions
+
+```{r}
+TP=cmatrix[1,1]
+TN=cmatrix[2,2]
+FP=cmatrix[2,1]
+FN=cmatrix[1,2]
+
+acc=(TP+TN)/(TP+TN+FP+FN)
+acc
+TPR=TP/(TP+FN)
+TNR=TN/(TN+FP)
+FPR=FP/(FP+TN)
+FNR=FN/(TP+FN)
+TPR
+TNR
+FPR
+FNR
+
+p=TP/(TP+FP)
+r=TP/(TP+FN)
+p
+r
+
+F1=2*r*p/(r+p)
+F1
+```
+
+
+#HouseVotes84 naiveBayes
+### ROC for HouseVotes84 naiveBayes model
+
+```{r, fig= T}
+
+housetrain=sample(nrow(HouseVotes84),round(0.7*nrow(HouseVotes84),0))
+housemodel = naiveBayes(Class ~ ., data = HouseVotes84[housetrain,])
+
+#phat for naiveBayes
+
+phat=predict(housemodel,newdata=HouseVotes84[-housetrain,],type="raw")[,2]
+
+library(pROC)
+houseroc=roc(response=HouseVotes84$Class[-housetrain],predictor=phat)
+houseroc
+plot(houseroc,ylab="True Positive Rate",xlab="False Positive Rate")
+```
+
+Flight data naiveBayes revisited
+
+```{r, fig=T}
+cattime=cut(flight$schedtime,breaks=seq(from=600,to=2200,by=100),right=FALSE)
+flight2=cbind(flight,cattime)
+
+
+set.seed(5364)
+train=sample(nrow(flight2),round(.7*nrow(flight2),0))
+model=naiveBayes(delay~carrier+dest+origin+weather+dayweek+cattime,data=flight2[train,])
+phat=predict(model,newdata=flight2[-train,],type="raw")[,1]
+
+#ROC for Flight Data naiveBayes model
+flightroc=roc(flight2$delay[-train]=="delayed",phat)
+flightroc
+plot(flightroc)
+
+#ROC for training data
+flighttrainroc=roc(flight2$delay[train]=="delayed",
+                   predict(model,newdata=flight2[train,],type="raw")[,1])
+plot(flighttrainroc)
+```
+
+ROC for flight decision tree
+
+```{r, fig=T}
+flighttree=rpart(delay~.,data=flight[train,])
+plot(flighttree)
+
+treephat=predict(flighttree,newdata=flight[-train,])[,1]
+plot(roc(flight$delay[-train]=="delayed",treephat))
+```
+
+ROC for flight kknn
+
+```{r, fig = T}
+flightkknn.fit=train.kknn(delay~.,data=flight[train,])
+kknnmodel=kknn(delay~.,train=flight[train,],test=flight[-train,],k=10,kernel="optimal")
+kknnphat=kknnmodel$prob[,1]
+plot(roc(flight$delay[-train]=="delayed",kknnphat))
+```
+
+Hosmer-Lemeshow Test 
+
+```{r}
+hlgof=function(pihat,Y,ngr){
+  sortframe=sort(pihat,index=TRUE)
+  pihat=sortframe$x
+  Y=Y[sortframe$ix]
+  s=floor(length(pihat)/ngr)  #groupsize
+  pipred=1:ngr
+  piobs=1:ngr
+  Chat=0
+  
+  for(i in 1:ngr){
+    index=(((i-1)*s+1):(i*s))
+    if(i==ngr){index=(((i-1)*s+1):(length(pihat)))}
+    pipred[i]=mean(pihat[index])
+    nk=length(index)
+    ok=sum(Y[index])
+    piobs[i]=ok/nk
+    Chat=Chat+(ok-nk*pipred[i])^2/(nk*pipred[i]*(1-pipred[i]))}
+  
+  pvalue=1-pchisq(Chat,ngr-2)
+  return(list(pipred=pipred,piobs=piobs,Chat=Chat,pvalue=pvalue))}
+```
+
+Hosmer-Lemeshow Goodness of Fit Plot for naiveBayes Model
+
+```{r, fig=T}
+flightBayeshlgof=hlgof(phat,flight$delay[-train]=="delayed",10)
+plot(flightBayeshlgof$pipred,flightBayeshlgof$piobs)
+lines(c(0,1),c(0,1),col='red')
+```
+
+Hosmer-Lemeshow Goodness of Fit Plot for kknn Model
+
+```{r, fig=T}
+flightkknnhlgof=hlgof(kknnphat,flight$delay[-train]=="delayed",10)
+flightkknnhlgof
+plot(flightkknnhlgof$pipred,flightkknnhlgof$piobs)
+lines(c(0,1),c(0,1),col='red')
+```
+
+Cost Sensitive Analysis for kknn Model
+
+```{r}
+p0 = 1/6
+newpreddelay=kknnphat
+newpreddelay[kknnphat>=p0]="delayed"
+newpreddelay[kknnphat<p0]="ontime"
+
+cmatrix=confmatrix(flight$delay[-train],newpreddelay)$matrix
+cmatrix
+
+TP=cmatrix[1,1]
+TN=cmatrix[2,2]
+FP=cmatrix[2,1]
+FN=cmatrix[1,2]
+
+cost=1*FP+5*FN
+cost
+```
+
+Cost for Typical Model (p0 = 0.5)
+
+```{r}
+p0 = 0.5
+newpreddelay=kknnphat
+newpreddelay[kknnphat>=p0]="delayed"
+newpreddelay[kknnphat<p0]="ontime"
+
+cmatrix=confmatrix(flight$delay[-train],newpreddelay)$matrix
+cmatrix
+
+TP=cmatrix[1,1]
+TN=cmatrix[2,2]
+FP=cmatrix[2,1]
+FN=cmatrix[1,2]
+
+cost=1*FP+5*FN
+cost
+```
+
+
+# SVM Example (Separable Case)
+
+Generating Example Data
+
+```{r, fig=T}
+x1=runif(100,0,1)
+y1=runif(100,0,1)
+x2=runif(100,9,10)
+y2=runif(100,0,1)
+class=c(rep("A",100),rep("B",100))
+mydata=data.frame(x=c(x1,x2),y=c(y1,y2),class=class)
+mydata$class=as.factor(mydata$class)
+plot(y~x,data=mydata,col=class)
+```
+
+Split Data
+
+```{r=T, fig=T}
+train=sample(nrow(mydata),round(nrow(mydata)*.7,0))
+
+#Fit SVM Model to Training Data
+model=svm(class~.,data=mydata[train,],kernel="linear",cost=1000)
+
+#Make predictions for test data
+predclass=predict(model,newdata=mydata[-train,])
+confmatrix(predclass,mydata$class[-train])
+
+#Plot model
+plot(model,data=mydata[train,])
+```
+
+Model info
+
+```{r}
+model
+model$rho     #The negative intercept, i.e., rho = -b
+model$SV      #Support vectors (All data is scaled, include SV's)
+model$index   #Positions in data set of SV's
+model$coefs   #coef = lambda*y
+
+#Calculating w and b
+w=t(model$coefs)%*%(model$SV)
+b=-model$rho
+```
+
+Checking SV's
+
+```{r}
+(model$SV%*%t(w))+b              #The first component of this vector is always 1,
+mydata[train,][model$index,]     #which determines the assignment of +1/-1 labels
+#to the different classes.
+```
+
+Soft Margin Example
+
+```{r, fig=T}
+set.seed(5364)
+x1=runif(100,0,1)
+y1=runif(100,0,1)
+x2=runif(100,9,10)
+y2=runif(100,0,1)
+class=c(rep("A",100),rep("B",100))
+x3=c(2,8)
+y3=c(0,1)
+class3=c("B","A")
+
+
+mydata2=data.frame(x=c(x1,x2,x3),y=c(y1,y2,y3),class=c(class,class3))
+mydata2$class=as.factor(mydata2$class)
+plot(y~x,data=mydata2,col=class)
+```
+
+```{r, fig=T}
+softmodel=svm(class~.,data=mydata2,kernel="linear",cost=1)
+plot(softmodel,data=mydata2)
+```
+
+Overlapping data
+
+```{r,fig=T}
+mydata3=data.frame(x=c(x1,x2-8.5),y=c(y1,y2),class=c(class))
+mydata3$class=as.factor(mydata3$class)
+plot(y~x,data=mydata3,col=class)
+
+overlapmodel=svm(class~.,data=mydata3,kernel="linear")
+plot(overlapmodel,data=mydata3)
+
+confmatrix(mydata3$class,predict(overlapmodel,data=mydata3))
+```
+
+Circular data
+
+```{r, fig=T}
+circledata=data.frame(
+  x=c(rnorm(500),
+      runif(100,-4,-3),
+      runif(100,3,4),
+      runif(100,-3,3),
+      runif(100,-3,3)),
+  y=c(rnorm(500),
+      runif(100,-4,4),
+      runif(100,-4,4),
+      runif(100,3,4),
+      runif(100,-4,-3)),
+  class=as.factor(c(rep("A",500),
+                    rep("B",400))))
+
+plot(y~x,data=circledata,col=class)
+xindex=(-300:300)/100
+lines(xindex,sqrt(9-xindex^2),col="red")
+lines(xindex,-sqrt(9-xindex^2),col="red")
+
+
+plot(y^2~I(x^2),data=circledata,col=class,xlab="x^2",ylab="y^2")
+xindex=(0:900)/100
+lines(xindex,9-xindex,col="red")
+```
+
+SVM for circledata
+
+```{r, fig=T}
+train=sample(nrow(circledata),round(nrow(circledata)*.7,0))
+
+circlemodel=svm(class~.,data=circledata[train,],
+                kernel="polynomial",gamma=1,coef0=1,degree=2)
+circlemodel
+plot(circlemodel,data=circledata[train,])
+
+predclass=predict(circlemodel,newdata=circledata[-train,])
+confmatrix(circledata$class[-train],predclass)
+```
+
+SVM for circledata without specifying kernel. Takes a while to run
+
+```{r}
+circlemodel=svm(class~.,data=circledata[train,])
+circlemodel
+plot(circlemodel,data=circledata[train,])
+
+predclass=predict(circlemodel,newdata=circledata[-train,])
+confmatrix(circledata$class[-train],predclass)
+```
+
+SVM for spam data
+
+```{r}
+library(kernlab)
+data(spam)
+
+set.seed(5364)
+train=sample(nrow(spam),round(nrow(spam)*.7,0))
+
+spammodel=svm(type~.,data=spam[train,])
+confmatrix(spam$type[-train],
+           predict(spammodel,newdata=spam[-train,]))
+```
+
+Tuning spam model
+
+```{r}
+tunespam=tune.svm(type~.,data=spam[train,],
+                  gamma = 10^(-6:-3), 
+                  cost = 10^(1:2))
+tunespam$best.parameters    #Gave gamma=0.001 and cost = 100
+
+spammodel2=svm(type~.,data=spam[train,],
+               gamma=0.001,
+               cost=100)
+confmatrix(spam$type[-train],
+           predict(spammodel2,newdata=spam[-train,]))
+```
+
+# NEURAL NETWORKS
+
+Logistic Function
+
+```{r, fig=T}
+logfct=function(x){
+  1/(1 + exp(-x))
+}
+
+xindex=(-400:400)/100
+plot(xindex,sapply(xindex,logfct),type="l")
+
+logfct(0)
+logfct(Inf)
+logfct(-Inf)
+```
+
+sqrt function example
+
+creating training data
+
+```{r}
+set.seed(5364)
+x=runif(100,0,100)
+y=sqrt(x)
+traindata=data.frame('x'= x,'y'=y)
+```
+training a neural network
+```{r, fig=T}
+library(nnet)
+source(url("http://faculty.tarleton.edu/crawford/documents/Math5364/plot.nnet.txt"))
+model=nnet(y~.,data=traindata,size=2,linout=TRUE)  #linout=TRUE for quantitative output
+plot(model)
+summary(model)
+model$wts
+```
+
+creating test data
+
+```{r, fig=T}
+testdata=data.frame(x=(1:10)^2,y=1:10)
+#testdata  #uncomment to see the test data
+
+#using neural network on test data
+predy=predict(model,newdata=testdata)
+data.frame(x=(1:10)^2,y=1:10,predy)
+
+plot((1:10)^2,1:10,type="l")
+lines((1:10)^2,predy,col="red")
+```
+
+Calculating output for x=100
+
+```{r}
+h1=0.91714234+0.13036318*100
+h2=-0.65519488+0.02313398*100
+h1
+h2
+logfct(h1)
+logfct(h2)
+
+o1=-10.16636809+8.94067627*logfct(h1)+13.28706236*logfct(h2)
+```
+
+Neural network for sqrt function with 10 hidden neurons
+
+```{r, fig=T}
+model2=nnet(y~.,data=traindata,size=10,linout=TRUE)
+plot(model2)
+predy2=predict(model2,newdata=testdata)
+
+data.frame(x=(1:10)^2,y=1:10,predy,predy2)
+
+plot((1:10)^2,1:10,type="l")
+lines((1:10)^2,predy2,col="red")
+```
+
+### Neural Network for Iris Data
+
+```{r, fig=T}
+set.seed(5364)
+train=sample(nrow(iris),round(nrow(iris)*.7,0))
+
+model=nnet(Species~Petal.Length+Petal.Width,data=iris[train,],size=2)
+predSpecies=predict(model,newdata=iris[-train,],type="class")
+confmatrix(iris$Species[-train],predSpecies)
+plot(model)
+```
+
+# Calculating output for first training example
+
+```{r}
+iris[-train,][1,]
+x=c(1,1.5,0.2)
+h1=model$wts[1:3]%*%x
+h2=model$wts[4:6]%*%x
+h1
+h2
+logfct(h1)
+logfct(h2)
+h=c(1,logfct(h1),logfct(h2))
+o1=model$wts[7:9]%*%h
+o2=model$wts[10:12]%*%h
+o3=model$wts[13:15]%*%h
+o1
+o2
+o3
+
+#softmax function
+softmax=function(x){
+  return(exp(x)/sum(exp(x)))
+}
+
+softmax(c(o1,o2,o3))
+
+#Predicted probabilities
+predict(model,newdata=iris[-train,])
+```
+
+iris model with 10 hidden neurons and all four features
+
+```{r, fig=T}
+model2=nnet(Species~.,data=iris[train,],size=10)
+predSpecies2=predict(model2,newdata=iris[-train,],type="class")
+confmatrix(iris$Species[-train],predSpecies2)
+plot(model2)
+```
+
+
+Generating Some Data
+
+```{r, fig=T}
+set.seed(5364)
+mydata=data.frame(x=c(runif(500,0,10),
+                      rnorm(500,5,1)),
+                  y=c(runif(500,0,10),
+                      rnorm(500,5,1)),
+                  class=as.factor(c(rep("A",500),
+                                    rep("B",500))))
+
+plot(y~x,data=mydata,col=class)
+```
+
+Neural Network
+
+```{r, fig=T}
+train=sample(nrow(mydata),round(0.7*nrow(mydata),0))
+
+model=nnet(class~.,data=mydata[train,],size=1)
+predclass=predict(model,newdata=mydata[-train,],type="class")
+confmatrix(mydata$class[-train],predclass)
+plot(model)
+```
+
+nnet with 10 neurons
+
+```{r, fig=T}
+model=nnet(class~.,data=mydata[train,],size=10)
+predclass=predict(model,newdata=mydata[-train,],type="class")
+confmatrix(mydata$class[-train],predclass)
+plot(model)
+```
+
+pihat and roc curve
+
+```{r, fig=T}
+pihat=predict(model,newdata=mydata[-train,])
+table(pihat>=0.5,predclass)   #B = 1
+
+library(pROC)
+plot(roc(response=mydata$class[-train],predictor=pihat))
+```
+
+How big can we make the model
+
+```{r}
+for(i in 1:20){
+  tempmodel=nnet(class~.,data=mydata[train,],size=i)
+  print(paste(i,"is ok"))
+}
+```
+
+Choosing size using k-fold CV
+
+createfolds function and find the accuracy over multiple iterations
+
+```{r, fig=T}
+createfolds=function(n,K){
+  reps=ceiling(n/K)
+  folds=sample(rep(1:K,reps))
+  return(folds[1:n])
+}
+
+#Folds for mydata
+set.seed(5364)
+folds=createfolds(nrow(mydata),10)
+
+#k-fold CV for Neural Net
+accmatrix=matrix(nrow=19,ncol=10)
+
+
+for(netsize in 1:19){
+  for(k in 1:10){
+    temptest=mydata[folds==k,]
+    temptrain=mydata[folds!=k,]
+    
+    tempnnet=nnet(class~.,data=temptrain,size=netsize)
+    accmatrix[netsize,k]=confmatrix(temptest$class,
+                                    predict(tempnnet,newdata=temptest,type="class"))$accuracy
+  }}
+
+
+accmatrix
+accvector=apply(accmatrix,1,mean)
+plot(1:19,accvector)
+which.max(accvector)
+```
+
+```{r, fig=T}
+
+model=nnet(class~.,data=mydata[train,],size=5)
+predclass=predict(model,newdata=mydata[-train,],type="class")
+confmatrix(mydata$class[-train],predclass)
+plot(model)
+plot(roc(response=mydata$class[-train],predictor=pihat))
+```
+
+
+## GRADIENT DESCENT FOR MULTIPLE REGRESSION MODE
+
+Creating some data
+
+```{r}
+set.seed(827)
+x1=runif(100,0,20)
+x2=rnorm(100,10,2)
+X=cbind(rep(1,100),x1,x2)
+y=100+5*x1+10*x2+10*rnorm(100)
+
+#fitting a model
+regmodel=lm(y~x1+x2)
+summary(regmodel)
+what=coef(regmodel)
+```
+
+gradient function
+
+```{r}
+gradientfct=function(w){
+  return(-t(X)%*%y+t(X)%*%X%*%w)
+}
+
+errorfct=function(w){
+  e=y-X%*%w
+  return(t(e)%*%e)
+}
+
+gradientfct(what)
+errorfct(what)
+```
+
+gradientdescent function 
+et0=initial learning rate
+maxit=maximum number of iterations
+abstol=absolute tolerance for norm of the gradient.
+If the norm of the gradient falls below abstol, the algorithm terminates.
+
+```{r}
+gradientdescent=function(gradientfct,errorfct,parameter0,eta0=0.1,maxit=100,abstol=10^-4){
+  parameter=parameter0
+  eta=eta0
+  olderror=errorfct(parameter)
+  for(i in 1:maxit){
+    parameter=parameter-eta*gradientfct(parameter)
+    if(sum(gradientfct(parameter)^2)<abstol){
+      print(paste("Converged in",i,"iterations."))
+      return(list(parameter=parameter,error=newerror,eta=eta))
+    }
+    newerror=errorfct(parameter)
+    if(olderror>newerror){eta=1.1*eta}else{eta=0.5*eta}
+    olderror=newerror
+  }
+  print(paste("Did not converge in",maxit,"iterations."))
+  return(list(parameter=parameter,error=newerror,eta=eta))
+  
+}
+
+what
+gradientdescent(gradientfct,errorfct,parameter0=c(1,1,1),eta0=10^-5,maxit=100000)
+```
+
+
+A COMPLICATED DATA SET
+```{r, fig = T}
+set.seed(5364)
+n=100000
+x=runif(n,0,50)
+y=runif(n,0,50)
+class=rep("A",n)
+index1=(x<10)&(y>5/2*x)&(y<50-5/2*x)
+index2=(y<10*sin(pi/50*x))
+index3=(y>40)&(x>125-5/2*y)&(x<5/2*(y-40)+25)
+index4=(x>15)&(x<35)&(y>15)&(y<35)
+index5=((x-40)^2+(y-40)^2<81)
+class[index1|index2|index3|index4|index5]="B"
+class=as.factor(class)
+mydata=data.frame(x,y,class)
+plot(y~x,col=class,data=mydata)
+```
+
+trainsample function
+
+```{r, fig=T}
+trainsample=function(dataset,trainprop){
+  return(sample(nrow(dataset),
+                round(nrow(dataset)*trainprop,0)))
+}
+
+
+train=trainsample(mydata,.7)
+
+
+#Neural network with one hidden layer.
+library(nnet)
+model=nnet(class~.,data=mydata[train,],size=30)
+predclass=predict(model,newdata=mydata[-train,],type="class")
+confmatrix(mydata$class[-train],predclass)
+
+#plot of test data
+plot(y~x,data=mydata[-train,],col=class)
+
+#plot of model predictions
+plot(y~x,data=mydata[-train,],col=as.factor(predclass))
+```
+
+CHANGING MAXIT TO LET GRADIENT DESCENT CONVERGE
+
+This took about 2 minutes on my machine.
+
+```{r, fig=T}
+model=nnet(class~.,data=mydata[train,],size=30,maxit=1000)
+predclass=predict(model,newdata=mydata[-train,],type="class")  
+confmatrix(mydata$class[-train],predclass)
+
+#plot of test data
+plot(y~x,data=mydata[-train,],col=class,main="Test Data")
+
+#plot of model predictions
+plot(y~x,data=mydata[-train,],col=as.factor(predclass),main="Model Classifications")
+```
+
+MULTILAYER PERCEPTRONS (NEURAL NETWORKS)
+
+mlp with RSNNS Package
+
+```{r, fig =T}
+library(RSNNS)
+
+mydataValues <- mydata[,1:2]
+mydataTargets <- decodeClassLabels(mydata[,3])
+
+MyData <- splitForTrainingAndTest(mydataValues, mydataTargets, ratio=0.3)
+MyData <- normTrainingAndTestSet(MyData)
+
+mlpmodel <- mlp(MyData$inputsTrain, MyData$targetsTrain, size=c(4,7,5), learnFuncParams=c(0.1),
+                maxit=50, inputsTest=MyData$inputsTest, targetsTest=MyData$targetsTest)
+plot.nnet(mlpmodel)
+```
+
+
+```{r}
+head(mlpmodel$fittedTestValues)
+head(MyData$targetsTest)
+
+predclass=(mlpmodel$fittedTestValues[,1]>=0.5)*1
+confmatrix(MyData$targetsTest[,1],predclass)
+```
+
+
+
+##ENSEMBLE METHODS
+
+Load germancredit and select training sample
+
+```{r}
+library(caret)
+germancredit = read.csv(url("http://faculty.tarleton.edu/crawford/documents/Math5364/germancredit.csv"))
+germancredit$Default=as.factor(germancredit$Default)
+set.seed(5364)
+
+train=trainsample(germancredit,.7)
+```
+
+Decision Tree for germancredit
+
+```{r}
+library(rpart)
+library(rattle)
+mytree=rpart(Default~.,data=germancredit[train,])
+fancyRpartPlot(mytree)
+predDefault=predict(mytree,newdata=germancredit[-train,],type="class")
+confmatrix(germancredit$Default[-train],predDefault)
+
+
+#adabag package
+library(adabag)
+
+#Bagging
+baggingmodel=bagging(Default~.,data=germancredit[train,])
+bagpred=predict(baggingmodel,newdata=germancredit[-train,],type="class")
+bagpred
+
+
+#Random Forest package
+library(randomForest)
+
+forestmodel=randomForest(Default~.,data=germancredit[train,])
+forestpred=predict(forestmodel,newdata=germancredit[-train,])
+confmatrix(germancredit$Default[-train],forestpred)
+
+
+#Boosting (Also from adabag package)
+boostingmodel=boosting(Default~.,data=germancredit[train,])
+boostpred=predict(boostingmodel,newdata=germancredit[-train,],type="class")
+boostpred
+```
+
+
+### THE MULTICLASS PROBLEM
+
+
+ONE AGAINST ONE METHOD
+
+training data for iris
+
+```{r}
+set.seed(5364)
+train=trainsample(iris,.7)
+
+#svm for iris
+model=svm(Species~.,data=iris[train,])
+predSpecies=predict(model,
+                    newdata=iris[-train,],
+                    type="class")
+confmatrix(iris$Species[-train],predSpecies)
+```
+
+one-against-one Method
+
+```{r}
+traindata=iris[train,]
+
+#setosa/versicolor model
+set.vers.train=traindata[(traindata$Species=="setosa")|
+                           (traindata$Species=="versicolor"),]
+set.vers.model=svm(Species~.,data=set.vers.train)
+set.vers.pred=predict(set.vers.model,
+                      newdata=iris[-train,],
+                      type="class")
+
+
+#setosa/virginica model
+set.virg.train=traindata[(traindata$Species=="setosa")|
+                           (traindata$Species=="virginica"),]
+set.virg.model=svm(Species~.,data=set.virg.train)
+set.virg.pred=predict(set.virg.model,
+                      newdata=iris[-train,],
+                      type="class")
+
+#versicolor/virginica model
+vers.virg.train=traindata[(traindata$Species=="versicolor")|
+                            (traindata$Species=="virginica"),]
+vers.virg.model=svm(Species~.,data=vers.virg.train)
+vers.virg.pred=predict(vers.virg.model,
+                       newdata=iris[-train,],
+                       type="class")
+
+#Tallying the votes
+set.votes=(set.virg.pred=="setosa")+
+  (set.vers.pred=="setosa")+
+  (vers.virg.pred=="setosa")
+
+vers.votes=(set.virg.pred=="versicolor")+
+  (set.vers.pred=="versicolor")+
+  (vers.virg.pred=="versicolor")
+
+virg.votes=(set.virg.pred=="virginica")+
+  (set.vers.pred=="virginica")+
+  (vers.virg.pred=="virginica")
+
+votes=cbind(set.votes,vers.votes,virg.votes)
+apply(votes,1,which.max)
+
+one.against.one.pred=c("setosa",
+                       "versicolor",
+                       "virginica")[apply(votes,
+                                          1,
+                                          which.max)]
+
+table(predSpecies,one.against.one.pred)
+predSpecies==one.against.one.pred
+```
+
+
+ONE AGAINST REST METHOD
+
+releveling Species variable
+
+```{r}
+levels(iris$Species)
+levels(iris$Species)=c(levels(iris$Species),"other")
+
+traindata=iris[train,]
+
+
+#setosa against the rest model
+set.train=traindata
+set.train$Species[(set.train$Species!="setosa")]="other"
+
+table(traindata$Species)
+table(set.train$Species)
+
+set.model=svm(Species~.,data=set.train)
+set.pred=predict(set.model,
+                 newdata=iris[-train,],
+                 type="class")
+
+table(set.pred,iris$Species[-train])
+
+
+#versicolor against the rest model
+vers.train=traindata
+vers.train$Species[(vers.train$Species!="versicolor")]="other"
+
+table(traindata$Species)
+table(vers.train$Species)
+
+vers.model=svm(Species~.,data=vers.train)
+vers.pred=predict(vers.model,
+                  newdata=iris[-train,],
+                  type="class")
+
+table(vers.pred,iris$Species[-train])
+
+
+#virginica against the rest model
+virg.train=traindata
+virg.train$Species[(virg.train$Species!="virginica")]="other"
+
+table(traindata$Species)
+table(virg.train$Species)
+
+virg.model=svm(Species~.,data=virg.train)
+virg.pred=predict(virg.model,
+                  newdata=iris[-train,],
+                  type="class")
+
+table(virg.pred,iris$Species[-train])
+
+
+#Tallying votes
+set.votes2=(set.pred=="setosa")+
+  (vers.pred=="other")+
+  (virg.pred=="other")
+
+vers.votes2=(set.pred=="other")+
+  (vers.pred=="versicolor")+
+  (virg.pred=="other")
+
+virg.votes2=(set.pred=="other")+
+  (vers.pred=="other")+
+  (virg.pred=="virginica")
+
+
+votes2=cbind(set.votes2,vers.votes2,virg.votes2)
+
+one.against.rest.pred=c("setosa",
+                        "versicolor",
+                        "virginica")[apply(votes2,
+                                           1,
+                                           which.max)]
+
+table(predSpecies,one.against.rest.pred)
+```
+
+Three accuracies
+```{r}
+data(iris)
+levels(iris$Species)
+
+#svm package predictions
+confmatrix(iris$Species[-train],
+           predSpecies)
+
+#one-against-one
+confmatrix(iris$Species[-train],
+           one.against.one.pred)
+
+#one-against-rest
+confmatrix(iris$Species[-train],
+           one.against.rest.pred)
+
+```
+
+
+which.max
+```{r}
+x=c(1,1,9,1,1,1,9,1)
+which.max(x)
+
+(1:length(x))[x==(max(x))]
+sample(((1:length(x))[x==(max(x))]),1)
+
+x=c(1,1,1,1,1,1,9,1)
+sample(((1:length(x))[x==(max(x))]),1)
+
+
+#randomizing which.max 
+#(can be used for breaking ties in voting)
+
+rand.which.max=function(x){
+  index=((1:length(x))[x==(max(x))])
+  return(sample(c(index,index),1))
+}
+
+rand.which.max(x)
+```
+
+PROGRAMMING ONE-AGAINST-REST
+
+Levels of Species and k
+
+```{r}
+data(iris)
+iris.levels=levels(iris$Species)
+k=length(iris.levels)
+
+#Adding "other" back to iris data
+levels(iris$Species)=c(levels(iris$Species),"other")
+traindata=iris[train,]
+
+#Creating lists to store models and predictions
+model.list=vector(length=k,mode="list")
+pred.list=vector(length=k,mode="list")
+
+#Creating models and predictions
+for(i in 1:k){
+  i.train=traindata
+  i.train$Species[(i.train$Species!=iris.levels[i])]="other"
+  i.model=svm(Species~.,data=i.train)
+  i.pred=predict(i.model,
+                 newdata=iris[-train,],
+                 type="class")
+  model.list[[i]]=i.model
+  pred.list[[i]]=i.pred 
+}
+
+#Checking model list
+model.list
+set.model$SV
+(model.list[[1]])$SV
+
+#Checking pred list
+pred.list[[1]]
+pred.list[[2]]
+pred.list[[3]]
+
+pred.list[[1]]==set.pred
+pred.list[[2]]==vers.pred
+pred.list[[3]]==virg.pred
+
+all(pred.list[[1]]==set.pred)
+all(pred.list[[2]]==vers.pred)
+all(pred.list[[3]]==virg.pred)
+
+
+#Votes
+vote.matrix=matrix(0,nrow=nrow(iris[-train,]),
+                   ncol=k)
+vote.matrix
+dim(vote.matrix)
+
+for(i in 1:k){
+  vote.matrix[,i]=vote.matrix[,i]+
+    (pred.list[[i]]==iris.levels[i])*1
+  
+  vote.matrix[,-i]=vote.matrix[,-i]+
+    (pred.list[[i]]=="other")*1
+}
+
+
+#Checking vote matrix
+vote.matrix==votes2
+all(vote.matrix==votes2)
+
+
+#Creating one-against-rest predictions with rand.which.max
+OAR.pred=iris.levels[apply(vote.matrix,
+                           1,
+                           rand.which.max)]
+
+
+all(OAR.pred==one.against.rest.pred)
+```
+
+

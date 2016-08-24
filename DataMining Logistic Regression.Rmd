@@ -1,0 +1,533 @@
+---
+title: "Logistic Regression in R"
+author: "Parash Upreti"
+date: "July 13, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# LOGISTIC REGRESSION IN R
+
+### Simple Example
+
+Generating data
+
+```{r}
+X=runif(100000,0,100)
+g=-3+.06 * X
+Pi=(1/(1+exp(-g)))
+U=runif(100000)
+Y=(U<Pi) * 1
+```
+
+Estimating model coefficients 
+
+```{r}
+model=glm(Y~X,family=binomial)
+summary(model)
+```
+
+MLE for beta
+
+```{r}
+betahat=coef(model)
+betahat
+```
+
+New Data
+
+```{r, fig=T}
+new.data=data.frame(X=1:100)
+
+# Estimating g for New Data
+ghat=cbind(1,1:100)%*%betahat
+plot(1:100,ghat,type="l",col="red")
+
+ghat=predict(model,newdata=new.data)
+plot(1:100,ghat,type="l",col="red")
+
+#Estimating Pi for New Data
+Pihat = 1/(1+exp(-ghat))
+plot(1:100,Pihat,type="l",col="red")
+
+Pihat = predict(model,newdata=new.data,type="response")
+plot(1:100,Pihat,type="l",col="red")
+```
+
+
+### Plots
+
+Y vs. X (Not very useful)
+
+```{r, fig=T}
+plot(X,Y)
+lines(1:100,Pihat,col="red")
+
+#Grouplot of Pihat vs X
+source("http://faculty.tarleton.edu/crawford/documents/math505/LogisticRegressionFunctions.txt")
+
+groupplot.results=groupplot(X,Y,20)
+plot(groupplot.results$x,groupplot.results$Pi,
+     xlab="X",
+     ylab="Pihat")
+
+lines(1:100,Pihat,col="red")
+```
+
+Comments
+  The data set has been broken into 20 groups based on values of X
+  
+  For each point in the plot, the x-coordinate is the average value of X
+  in that group.
+
+  For each point in the plot, the y-coordinate is the proportion of observations
+  in that group where Y=1.  In other words, the y-coordinates provide an estimate of
+  Pi = P(Y=1) for each group.
+
+
+
+### Plot of ghat vs X
+
+```{r,fig=T}
+group.Pihat=groupplot.results$Pi
+group.ghat=log(group.Pihat/(1-group.Pihat))
+
+plot(groupplot.results$x,group.ghat)
+lines(1:100,ghat,col="red")
+
+plot(groupplot.results$x,groupplot.results$g,
+     xlab="X",
+     ylab="Logit")
+lines(1:100,ghat,col="red")
+
+
+#Boxplot of X vs. Y
+plot(as.factor(Y),X)
+```
+
+### An Example Involving Curvature
+
+```{r, fig=T}
+set.seed(5366)
+X=runif(100000,0,100)
+g=-3+.05524*X -.002333*X^2 + .00002381*X^3
+Pi=(1/(1+exp(-g)))
+U=runif(100000)
+Y=(U<Pi) * 1
+
+
+#Degree 1 model Pihat vs X
+model1=glm(Y~X,family=binomial)
+summary(model1)
+groupplot.results=groupplot(X,Y,20)
+plot(groupplot.results$x,groupplot.results$Pi,
+     xlab="X",
+     ylab="Pihat")
+
+x.plot.vector=1:100
+Pi.plot.vector=predict(model1,
+                       newdata=data.frame(X=x.plot.vector),
+                       type="response")
+lines(x.plot.vector,
+      Pi.plot.vector,
+      col="red")
+```
+
+### Degree 1 model Logit (ghat) vs X
+
+```{r, fig=T}
+plot(groupplot.results$x,groupplot.results$g,
+     xlab="X",
+     ylab="Logit")
+x.plot.vector=1:100
+g.plot.vector=predict(model1,
+                      newdata=data.frame(X=x.plot.vector))
+lines(x.plot.vector,
+      g.plot.vector,
+      col="red")
+```
+
+### Degree 2 model Pihat vs X
+
+```{r,fig=T}
+model2=glm(Y~X+I(X^2),family=binomial)
+summary(model2)
+groupplot.results=groupplot(X,Y,20)
+plot(groupplot.results$x,groupplot.results$Pi,
+     xlab="X",
+     ylab="Pihat")
+
+x.plot.vector=1:100
+Pi.plot.vector=predict(model2,
+                       newdata=data.frame(X=x.plot.vector),
+                       type="response")
+lines(x.plot.vector,
+      Pi.plot.vector,
+      col="red")
+```
+
+### Degree 2 model Logit (ghat) vs X
+
+```{r, fig=T}
+plot(groupplot.results$x,groupplot.results$g,
+     xlab="X",
+     ylab="Logit")
+x.plot.vector=1:100
+g.plot.vector=predict(model2,
+                      newdata=data.frame(X=x.plot.vector))
+lines(x.plot.vector,
+      g.plot.vector,
+      col="red")
+```
+
+
+### Degree 3 model Pihat vs X
+
+```{r,fig=T}
+model3=glm(Y~X+I(X^2)+I(X^3),family=binomial)
+summary(model3)
+groupplot.results=groupplot(X,Y,20)
+plot(groupplot.results$x,groupplot.results$Pi,
+     xlab="X",
+     ylab="Pihat")
+
+x.plot.vector=1:100
+Pi.plot.vector=predict(model3,
+                       newdata=data.frame(X=x.plot.vector),
+                       type="response")
+lines(x.plot.vector,
+      Pi.plot.vector,
+      col="red")
+```
+
+### Degree 3 model Logit (ghat) vs X
+
+```{r}
+plot(groupplot.results$x,groupplot.results$g,
+     xlab="X",
+     ylab="Logit")
+x.plot.vector=1:100
+g.plot.vector=predict(model3,
+                      newdata=data.frame(X=x.plot.vector))
+lines(x.plot.vector,
+      g.plot.vector,
+      col="red")
+```
+
+
+### Degree 4 model Pihat vs X
+
+```{r, fig=T}
+model4=glm(Y~X+I(X^2)+I(X^3)+I(X^4),family=binomial)
+summary(model4)
+groupplot.results=groupplot(X,Y,20)
+plot(groupplot.results$x,groupplot.results$Pi,
+     xlab="X",
+     ylab="Pihat")
+
+x.plot.vector=1:100
+Pi.plot.vector=predict(model4,
+                       newdata=data.frame(X=x.plot.vector),
+                       type="response")
+lines(x.plot.vector,
+      Pi.plot.vector,
+      col="red")
+```
+
+### Degree 4 model Logit (ghat) vs X
+
+```{r,fig=T}
+plot(groupplot.results$x,groupplot.results$g,
+     xlab="X",
+     ylab="Logit")
+x.plot.vector=1:100
+g.plot.vector=predict(model4,
+                      newdata=data.frame(X=x.plot.vector))
+lines(x.plot.vector,
+      g.plot.vector,
+      col="red")
+```
+
+## Testing model1 vs model3
+
+```{r}
+
+
+G=model1$deviance-model3$deviance
+pchisq(G,lower.tail=FALSE,df=model1$df.residual-model2$df.residual)
+
+LRtest(model1,model3)   #This is a function from LogisticRegressionFunctions.txt
+LRtest(model3,model4)
+```
+
+## A Multivariate Example
+
+```{r}
+set.seed(5366)
+Rank=rnorm(200,.67,.1)
+SAT=round(rnorm(200,980,132),-1)
+ShoeSize=round(rnorm(200,9,1),1)
+U=runif(200,0,1)
+Mother=1:200
+
+
+for(i in 1:200){
+  if(U[i]<.5){Mother[i]="SomeCollege"}
+  if((U[i]>.5)&(U[i]<.8)){Mother[i]="Bachelors"}
+  if((U[i]>.8)&(U[i]<.95)){Mother[i]="HighSchool"}
+  if(U[i]>0.95){Mother[i]="GradDegree"}
+}
+
+
+Mother=as.factor(Mother)
+Mother=relevel(Mother,4)
+
+
+tempmodel=lm(1:200~Rank+SAT+Mother)
+X=model.matrix(tempmodel)
+beta=c(-9.3,10,.00364,1.5,1.5,0)
+g=X%*%beta
+Pi=1/(1+exp(-g))
+U2=runif(200,0,1)
+Retention=(U2<Pi)*1
+Retention.data=data.frame(Rank,SAT,ShoeSize,Mother)
+
+#Fitting a model
+model=glm(Retention~.,data=Retention.data,family=binomial)
+summary(model)
+```
+
+Better Plotting Function
+
+```{r, fig=T}
+quantlogitplot=function(Y,x,degree,xname,Yname,numgroups,yrange){
+  xrange=range(x)
+  n=length(Y)
+  X=rep(1,n)
+  for(i in 1:degree){
+    X=cbind(X,x^i)
+  }
+  model=glm(Y~X-1,family='binomial')
+  L=groupplot(x,Y,numgroups)
+  plot(L$x,L$g,xlab=xname,ylab=Yname,ylim=yrange)
+  a=xrange[1]
+  b=xrange[2]
+  index=(1:100)/100
+  index=a+(b-a)*index
+  Index=rep(1,100)
+  for(i in 1:degree){
+    Index=cbind(Index,index^i)
+  }
+  betahat=coef(model)
+  lines(index,Index%*%betahat,col='red')
+  
+  
+}
+```
+
+Rank model
+
+```{r, fig=T}
+quantlogitplot(Retention,Rank,1,"Rank","Logit",10,c(-3,3))
+rank.model=glm(Retention~Rank,family=binomial)
+rank.model.2=glm(Retention~Rank+I(Rank^2),family=binomial)
+summary(rank.model)
+summary(rank.model.2)
+LRtest(rank.model,rank.model.2)
+```
+
+SAT model
+
+```{r, fig=T}
+quantlogitplot(Retention,SAT,1,"SAT","Logit",10,c(-3,3))
+SAT.model=glm(Retention~SAT,family=binomial)
+SAT.model.2=glm(Retention~SAT+I(SAT^2),family=binomial)
+summary(SAT.model)
+summary(SAT.model.2)
+LRtest(SAT.model,SAT.model.2)
+
+```
+
+
+Shoe Size model
+
+```{r,fig=T}
+quantlogitplot(Retention,ShoeSize,1,"Shoe Size","Logit",10,c(-3,3))
+summary(glm(Retention~ShoeSize,family=binomial))
+```
+
+Mother's Education Level
+
+```{r}
+table(Mother)
+
+model=glm(Retention~.,data=Retention.data,family=binomial)
+summary(model)
+
+model0=glm(Retention~Rank+SAT+ShoeSize,data=Retention.data,family=binomial)
+summary(model0)
+
+LRtest(model0,model)
+```
+
+Recoding Mother's Education Level
+
+```{r}
+table(Mother)
+table(as.numeric(Mother))
+Mother.Recode=c("HighSchool/SomeCollege",
+                "Bachelors/GradDegree",
+                "Bachelors/GradDegree",
+                "HighSchool/SomeCollege"
+                )
+Mother2=Mother.Recode[Mother]
+table(Mother2)
+
+
+
+model2=glm(Retention~Rank+SAT+ShoeSize+Mother2,data=Retention.data,family=binomial)
+summary(model2)
+
+LRtest(model2,model)
+```
+
+Removing Shoe Size
+
+```{r}
+model3=glm(Retention~Rank+SAT+Mother2,data=Retention.data,family=binomial)
+summary(model3)
+
+LRtest(model3,model)
+```
+
+### Variable Selection
+
+Stepwise
+```{r}
+model=glm(Retention~.,data=Retention.data,family=binomial)
+step.model=step(model)
+
+
+#Best Subsets
+library(bestglm)
+
+X=model.matrix(model)
+X=X[,2:(ncol(X))]
+y=Retention
+Xy=data.frame(X,y)
+
+best.model=bestglm(Xy,family=binomial)
+names(best.model)
+summary(best.model$BestModel)
+```
+
+
+## Assessing Model Performance and Fit
+
+```{r}
+source("http://faculty.tarleton.edu/crawford/documents/Math5364/MiscRFunctions.txt")
+
+#Training Data
+Retention.data.2=data.frame(Retention,Rank,SAT,Mother2)
+train=trainsample(Retention.data.2,0.7)
+
+
+#Fitting Model
+
+model=glm(Retention~.,
+          data=Retention.data.2[train,],
+          family=binomial)
+summary(model)
+```
+
+Classification Accuracy
+
+```{r}
+#confmatrix function from previous tutorial
+confmatrix=function(y,predy){
+  matrix=table(y,predy)
+  accuracy=sum(diag(matrix))/sum(matrix)
+  return(list(matrix=matrix,accuracy=accuracy,error=1-accuracy))
+}
+
+Pihat=predict(model,
+              newdata=Retention.data.2[-train,],
+              type="response")
+pred.retention=(Pihat>=0.5)*1
+table(pred.retention)
+
+confmatrix(Retention[-train],pred.retention)
+```
+
+ROC Curve
+
+```{r, fig=T}
+library(pROC)
+
+plot(roc(Retention[-train],Pihat))
+```
+
+Hosmer-Lemeshow Goodness-of-fit Test
+
+```{r}
+library(MKmisc)
+
+model=glm(Retention~.,
+          data=Retention.data.2,
+          family=binomial)
+
+Pihat=predict(model,
+              type="response")
+
+HLgof.test(fit=Pihat,obs=Retention)
+```
+
+
+Visualizing HLgof.test
+
+```{r, fig=T}
+hlgof=function(pihat,Y,ngr){
+  sortframe=sort(pihat,index=TRUE)
+  pihat=sortframe$x
+  Y=Y[sortframe$ix]
+  s=floor(length(pihat)/ngr)  #groupsize
+  pipred=1:ngr
+  piobs=1:ngr
+  Chat=0
+  
+  for(i in 1:ngr){
+    index=(((i-1)*s+1):(i*s))
+    if(i==ngr){index=(((i-1)*s+1):(length(pihat)))}
+    pipred[i]=mean(pihat[index])
+    nk=length(index)
+    ok=sum(Y[index])
+    piobs[i]=ok/nk
+    Chat=Chat+(ok-nk*pipred[i])^2/(nk*pipred[i]*(1-pipred[i]))}
+  
+  pvalue=1-pchisq(Chat,ngr-2)
+  return(list(pipred=pipred,piobs=piobs,Chat=Chat,pvalue=pvalue))}
+
+
+
+hlgof.results=hlgof(Pihat,Retention,10)
+```
+
+Comparing Pihat and Piobs
+
+```{r,fig=T}
+plot(hlgof.results$pipred,hlgof.results$piobs,
+     xlim=c(0,1),
+     ylim=c(0,1))
+lines((1:100)/100,(1:100)/100,col="red")
+
+piobs=hlgof.results$piobs
+pipred=hlgof.results$pipred
+cbind(piobs,pipred)
+cbind(piobs,pipred)*20
+
+
+sum((20*piobs-20*pipred)^2/(20*pipred*(1-pipred)))
+```
