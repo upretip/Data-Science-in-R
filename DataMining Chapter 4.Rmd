@@ -24,6 +24,7 @@ plot(Petal.Length,Petal.Width,col=c('blue','red','purple')[Species])
 ## Decision trees with the rpart package.
 
 ```{r, fig=T}
+#also need to install package rpart.plot
 library(rpart)
 library(rattle)
 library(RColorBrewer)
@@ -112,8 +113,6 @@ train=sample(nrow(iris),round(0.7*nrow(iris),0))
 
 Use training data to construct a tree.
 ```{r, fig= T}
-library(rpart)
-library(rattle)
 iristree=rpart(Species~.,data=iris[train,])
 fancyRpartPlot(iristree)
 ```
@@ -121,12 +120,6 @@ fancyRpartPlot(iristree)
 confmatrix function
 
 ```{r}
-confmatrix=function(y,predy){
-  matrix=table(y,predy)
-  accuracy=sum(diag(matrix))/sum(matrix)
-  return(list(matrix=matrix,accuracy=accuracy,error=1-accuracy))
-}
-
 #Confusion matrix, accuracy, and error rate for training data.
 confmatrix(iris$Species[train],
            predict(iristree,newdata=iris[train,],type="class"))
