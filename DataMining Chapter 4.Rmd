@@ -1,29 +1,46 @@
 ---
-title: "Chapter 4"
+title: "Tree Based Classification/ Model Validation"
 author: "Parash Upreti"
 date: "July 11, 2016"
 output: html_document
 ---
 
+### Summary of this document
+
+- Exploring dataset avaialbe in R \n
+<tab><tab> -Iris data exploration \n 
+  
+- Decision Tree Algorithm
+<tab><tab>. -Using rPart and Ctree packags
+  
+- Cross Validations and testing hypothesis statistically
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# CHAPTER 4 EXAMPLES IN R
+### Exploring the iris data set.
 
+Iris dataset is preloaded in R
 
-Exploring the iris data set.
 ```{r, fig = T}
-head(iris)
 attach(iris)
+head(iris)
 plot(Petal.Length,Petal.Width)
-plot(Petal.Length,Petal.Width,col=Species)
+```
+
+Additional options in basic R polt
+
+```{r, fig=T}
 plot(Petal.Length,Petal.Width,col=c('blue','red','purple')[Species])
 ```
 
 ## Decision trees with the rpart package.
 
-```{r, fig=T}
+Decision tree is a tree based algorithm for classification and regression problems. 
+
+```{r, fig=T, message=FALSE, warning=FALSE}
 #also need to install package rpart.plot
 library(rpart)
 library(rattle)
@@ -35,12 +52,18 @@ iristree=rpart(Species~.,data=iris)
 fancyRpartPlot(iristree)
 ```
 
-Confusion matrix.
+Confusion matrix can be used to test how well the classification worked based on the algorithm.
 
 ```{r}
 predSpecies=predict(iristree,newdata=iris,type="class")
 confusionmatrix=table(Species,predSpecies)
-confusionmatrix
+
+#confmatrix function
+confmatrix=function(y,predy){
+  matrix=table(y,predy)
+  accuracy=sum(diag(matrix))/sum(matrix)
+  return(list(matrix=matrix,accuracy=accuracy,error=1-accuracy))
+}
 ```
 
 A second look at the iris scatterplot.
@@ -53,41 +76,37 @@ lines(rep(2.4,4),0:3,col='black')
 
 Accuracy for rpart tree.
 
-```{r}
+Accuracy for a model can be tested by looking at the true output value against the predicted value. 
+
+The confusion matrix function above calculates accuracy for the decision tree prediction.
+
+
+```{r, echo=FALSE}
 accuracy=sum(diag(confusionmatrix))/sum(confusionmatrix)
 accuracy
-
-#confmatrix function
-confmatrix=function(y,predy){
-  matrix=table(y,predy)
-  accuracy=sum(diag(matrix))/sum(matrix)
-  return(list(matrix=matrix,accuracy=accuracy,error=1-accuracy))
-}
 ```
 
-confmatrix for iristree
+
 ```{r}
 confmatrix(iris$Species,
            predict(iristree,newdata=iris,type="class"))   
 ```
 
 The party package.
-```{r, fig=T}
-library(party, quietly = T, warn.conflicts = F, verbose = F)
+```{r, fig=T, message=F, warning=F}
+library(party)
 iristree2=ctree(Species~.,data=iris)
 plot(iristree2)
 ```
 
-Simple plot.
+Simple plot of decision tree using `ctree` .
 
 ```{r, fig=T}
 plot(iristree2,type='simple')
 
-
 #ctree confusion matrix.
 predSpecies=predict(iristree2,newdata=iris)
-confusionmatrix=table(Species,predSpecies)
-confusionmatrix
+confmatrix(Species,predSpecies)
 ```
 
 Controling the depth of the tree.
@@ -101,7 +120,7 @@ plot(iristree3)
 
 # Training and Testing Sets for Iris Data
 
-```{r}
+```{r, echo=T,results= "hide"}
 set.seed(1120)
 train=sample(150,105)
 iris[train,]    #Training data  (70% of the data)
@@ -117,7 +136,7 @@ iristree=rpart(Species~.,data=iris[train,])
 fancyRpartPlot(iristree)
 ```
 
-confmatrix function
+Using confmatrix function to calculate accuracy and error
 
 ```{r}
 #Confusion matrix, accuracy, and error rate for training data.
@@ -164,27 +183,29 @@ confmatrix(testdata$class,predict(extree1,newdata=testdata,type='class'))
 Number of Nodes for Tree 1
 
 ```{r}
-extree1$frame       #Frame of information about the nodes
+#extree1$frame       #Frame of information about the nodes
 dim(extree1$frame)  #First entry tells us how many nodes there are
 ```
 
 Class Breakdown for Training and Testing Data
 ```{r}
-table(traindata$class)
-table(traindata$class)/900
-
-table(testdata$class)
-table(testdata$class)/2100
+prop.table(table(traindata$class))
+prop.table(table(testdata$class))
+nrow(traindata)
+nrow(testdata)
 ```
 
+
+## Statistical tests to test the model
 
 ### Confidence Intervals for Classification Accuracy
 
 
-Exact binomial test. Example test data had 2100 records, and 1488 were classified correctly.
+Exact binomial test. Example test data had 2100 records, and 1488 were classified correctly. The confidence interval based on the binomial distribution 
+
 ```{r}
 confmatrix(testdata$class,predict(extree1,newdata=testdata,type='class'))
-binom.test(1488,2100)
+binom.test(1488, 2100) #binom.test(testdata$class[testdata$class==0],nrow(testdata))
 ```
 
 Building tree 2
@@ -192,7 +213,7 @@ Building tree 2
 ```{r, fig=T}
 extree2=rpart(class~.,data=traindata,
               control=rpart.control(minsplit=1,cp=0))
-plot(extree2)
+fancyRpartPlot(extree2)
 confmatrix(traindata$class,predict(extree2,newdata=traindata,type='class'))
 confmatrix(testdata$class,predict(extree2,newdata=testdata,type='class'))
 ```
@@ -228,7 +249,7 @@ mcnemar.test(mcnemartable)
 ```
 
 Exact McNemar Test
-```{r}
+```{r, warning=F}
 library(exact2x2)
 mcnemar.exact(mcnemartable)
 ```
@@ -239,7 +260,7 @@ mcnemar.exact(mcnemartable)
 
 Combine traindata and testdata.
 
-```{r}
+```{r, warning= F}
 library(cvTools)
 Exdata=rbind(traindata,testdata)
 folds=cvFolds(nrow(Exdata),K=10,type='random')
